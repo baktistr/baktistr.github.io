@@ -139,6 +139,61 @@
 }
 
 /*
+   Header2
+   ========================================================================== */
+
+   .header-home{
+	display: block;
+	margin: 50px auto;
+	text-align: center;
+	position: relative;
+	z-index: 1;
+}
+
+.selfie {
+	width: 200px;
+    margin-bottom: 25px;
+    border-radius: 100%;
+    box-shadow: 0;
+    opacity: 1;
+}
+
+.header-home > .description {
+	font-size: 18px;
+	color:  #71716f;
+	font-family: Georgia, 'Times New Roman', Times, serif;
+	margin: 3px;
+}
+
+.social-links a {
+	text-decoration:none;
+}
+
+.social-links i {
+	transition: none;
+}
+.social {
+	background: transparent;
+    font-size: 24px;
+    height: 40px;
+    width: 40px;
+    text-align: center;
+    line-height: 40px;
+    -webkit-border-radius: 50px;
+    -moz-border-radius: 50px;
+    border-radius: 50px;
+	display: inline-block;
+    min-width: 10px;
+    vertical-align: middle;
+}
+
+.social:hover {
+    background: #3a6844;
+	color:white;
+	transition: none;
+}
+
+/*
    Main content
    ========================================================================== */
 

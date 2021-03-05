@@ -33,6 +33,8 @@
     {% include browser-upgrade.html %}
     {% include header.html %}
     {% include navigation-sliding.html %}
+    {% if page.url == "/" %} {% include header2.html %} {% endif %}
+
 
     <div id="page-wrapper">
       {{ content }}

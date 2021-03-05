@@ -1,7 +1,7 @@
 # Site wide configuration
 
-title: "My Site"
-description: "This is a description of my awesome site."
+title: "Bakti Satria Adhityatama"
+description: "Personal Landing Page"
 logo: # 120x120 px default image used for Twitter summary card
 teaser: # 400x250 px default teaser image used in image archive grid
 locale: en
@@ -26,9 +26,9 @@ plugins:
 
 # Site owner
 owner:
-  name:
-  email:
-  twitter:
+  name: "Bakti Satria Adhityatama"
+  email: "bakti.satria.a@gmail.com"
+  twitter: "baktistr"
   google:
     ad-client:
     ad-slot:
