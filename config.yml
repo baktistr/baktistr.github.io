@@ -1,0 +1,147 @@
+languageCode: en-us
+baseURL: "https://baktistr.github.io/"
+title: Bakti Satria Adhityatama
+paginate: 5
+theme: PaperMod
+
+enableRobotsTXT: true
+buildDrafts: false
+buildFuture: false
+buildExpired: false
+
+#googleAnalytics: UA-123-45
+
+minify:
+  disableXML: true
+  minifyOutput: true
+
+params:
+  env: production # to enable google analytics, opengraph, twitter-cards and schema.
+  title: Bakti Satria Adhityatama
+  description: "This is a blog and portfolio website of Bakti Satria Adhityatama, I Write anything about Cyber Security, Data Science, and Artificial Intelligence, related things"
+  keywords: [Blog, Portfolio, Cyber Security, Data Science, AI]
+  author: Bakti Satria Adhityatama
+  # author: ["Me", "You"] # multiple authors
+  #images: ["<link or path of image for opengraph, twitter-cards>"]
+  DateFormat: "January 2, 2006"
+  defaultTheme: auto # dark, light
+  disableThemeToggle: false
+
+  ShowReadingTime: true
+  ShowShareButtons: true
+  ShowPostNavLinks: true
+  ShowBreadCrumbs: true
+  ShowCodeCopyButtons: false
+  disableSpecial1stPost: false
+  disableScrollToTop: false
+  comments: false
+  hidemeta: false
+  hideSummary: false
+  showtoc: false
+  tocopen: false
+
+  label:
+    text: "Bakti Satria Adhityatama"
+    icon: "images/logo_blog.png"
+    iconHeight: 35
+
+  # profile-mode
+  profileMode:
+    enabled: true # needs to be explicitly set
+    title: "Hello There! \U0001F44B"
+    subtitle: "My name is **Bakti Satria Adhityatama**. Welcome to my Blog and Portfolio Website. 
+    I Write anything about ***Cyber Security***, ***Data Science***, and ***Artificial Intelligence*** related things."
+    imageUrl: "images/me_front.jpg"
+    imageWidth: 120
+    imageHeight: 120
+    imageTitle: "Bakti Satria Adhityatama"
+    buttons:
+      - name: Blogs
+        url: blogs
+      - name: Writeups
+        url: writeups
+      - name: Projects
+        url: projects
+
+  # home-info mode
+  homeInfoParams:
+    Title: "Hello There! \U0001F44B"
+    Content: "My name is **Bakti Satria Adhityatama**. Welcome to my Blog and Portfolio Website. 
+    I Write anything about ***Cyber Security***, ***Data Science***, and ***Artificial Intelligence*** related things."
+
+  socialIcons:
+    - name: wordpress
+      url: "http://baktistr.wordress.com"
+    - name: twitter
+      url: "https://twitter.com/baktistr"
+    - name: linkedin
+      url: "https://www.linkedin.com/in/baktistr/"
+    - name: github
+      url: "https://github.com/baktistr"
+    - name: Rss
+      url: "index.xml"
+    
+  analytics:
+    google:
+      SiteVerificationTag: "XYZabc"
+    bing:
+      SiteVerificationTag: "XYZabc"
+    yandex:
+      SiteVerificationTag: "XYZabc"
+
+  cover:
+    hidden: true # hide everywhere but not in structured data
+    hiddenInList: true # hide on list pages and home
+    hiddenInSingle: false # hide on single page
+
+  editPost:
+    URL: ""
+    Text: "" # edit text
+    appendFilePath: true # to append file path to Edit link
+
+  # https://fusejs.io/api/options.html
+  fuseOpts:
+    isCaseSensitive: false
+    shouldSort: true
+    location: 0
+    distance: 1000
+    threshold: 0.4
+    minMatchCharLength: 0
+    keys: ["title", "permalink", "summary", "content"]
+
+# for search
+outputs:
+  home:
+      - HTML
+      - RSS
+      - JSON
+      
+taxonomies:
+  category: categories
+  tag: tags
+
+menu:
+  main:
+    - identifier: about
+      name: About
+      url: /about/
+      weight: 1
+    - identifier: blog
+      name: Blogs
+      url: /blogs/
+      weight: 2
+    - identifier: writeups
+      name: Writeups
+      url: /writeups/
+      weight: 3
+    - identifier: projects
+      name: Projects
+      url: /projects/
+      weight: 4
+    - name: Archives
+      url: /archives/
+      weight: 5
+    - name: Search
+      url: /search/
+      weight: 6
+    
