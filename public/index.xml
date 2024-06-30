@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Bakti Satria Adhityatama</title>
+    <link>http://localhost:1313/</link>
+    <description>Recent content on Bakti Satria Adhityatama</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sun, 22 Jan 2023 10:41:25 +0700</lastBuildDate><atom:link href="http://localhost:1313/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>About Me</title>
+      <link>http://localhost:1313/about/</link>
+      <pubDate>Sun, 22 Jan 2023 10:41:25 +0700</pubDate>
+      
+      <guid>http://localhost:1313/about/</guid>
+      <description>Hello there, My name is Bakti Satria Adhityatama.
+Welcome to Blog &amp;amp; Portfolio Website. here I Write anything about Cyber Security, Data Science, and Artificial Intelligence related things.
+I&amp;rsquo;m Currently a candidate of full-ride scholarship from Telkom (GPSP - Great People Scholarship Awards), thus currently applying for MBA and Msc in Top 10 Universities on US
+I’m a full-time employee of Telkom Indonesia as a data Scientist
+I’m a husband, and father of one adorable daughter</description>
+    </item>
+    
+    
+    
+  </channel>
+</rss>

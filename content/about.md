@@ -8,15 +8,17 @@ Hello there, My name is **Bakti Satria Adhityatama**.
 
 Welcome to **Blog & Portfolio Website**. here I Write anything about **_Cyber Security_**, **_Data Science_**, and **_Artificial Intelligence_** related things.
 
-🚩 I’m currently a full-time employee of [Telkom Indonesia](https://telkom.co.id/) as a data Scientist
-\
-👨‍👩‍👧 I’m a husband, and father of one adorable daughter
-\
-🌱 I’m currently learning data structures and algorithms while attempting to solve [leetcode](https://leetcode.com/baktistr/) problems 
-\
-🏫 I have BSc and MSc. in Electrical Engineering From [Institut Teknologi Bandung (ITB)](https://itb.ac.id/)
-\
-🤟 I have a big interest in Cyber Security & Data Science field
+-  I'm Currently a candidate of full-ride scholarship from Telkom (GPSP - Great People Scholarship Awards), thus currently applying for MBA and Msc in Top 10 Universities on US
+
+-  I’m a full-time employee of [Telkom Indonesia](https://telkom.co.id/) as a data Scientist
+
+-  I’m a husband, and father of one adorable daughter
+
+-  I’m currently learning data structures and algorithms while attempting to solve [leetcode](https://leetcode.com/baktistr/) problems 
+
+-  I have BSc and MSc. in Electrical Engineering From [Institut Teknologi Bandung (ITB)](https://itb.ac.id/)
+
+-  I have a big interest in Cyber Security & Data Science field
 
 
 ## Professional Works and Experiences
@@ -55,6 +57,6 @@ Currently, I maintain this blog to document everything I learn on my journey to 
 
 I relish challenges and continuously push myself towards achieving greater goals. Most of the knowledge I possess comes from self-teaching and exploration. I genuinely believe that writing is one of the most potent tools to reinforce the information in my mind. Moreover, it's my guiding principle to remain a **lifelong learner** and always seek profound knowledge.
 
-I also curate this blog to express heartfelt gratitude to everyone who has indirectly aided me with their writings, guides, blogs, etc., especially when I encounter challenges. I hope this chain of knowledge continues unbroken.
+I also curate this blog to express heartfelt gratitude to everyone who has indirectly aided me with their writings, guides, blogs, etc., especially when I encounter challenges. I hope this chain of knowledge continues unbroken. I also want to make sure that I 'OWN' my blog, by writing contents using Static-Site-Generator SSG like Hugo like this, and hosted in Github.
 
 Additionally, I maintain another non-technical blog on WordPress (written in Bahasa Indonesia) that captures my daily reflections. You can find it [here](https://baktistr.wordpress.com/).
