@@ -33,13 +33,13 @@ jobs:
         run: sudo snap install dart-sass-embedded
 
       - name: Checkout source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
       - name: Setup GitHub Pages
         id: pages
-        uses: actions/configure-pages@v2
+        uses: actions/configure-pages@v4
 
       - name: Install Node.js dependencies
         run: |
@@ -52,7 +52,7 @@ jobs:
         run: hugo --minify --baseURL "${{ steps.pages.outputs.base_url }}/"
 
       - name: Upload artifact for deployment
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./public
 
@@ -63,9 +63,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      # ✅ Ensure this action is explicitly pulled in
-      - uses: actions/upload-artifact@v3
-
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v1
+        uses: actions/deploy-pages@v4
