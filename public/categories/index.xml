@@ -4,7 +4,8 @@
     <title>Categories on Bakti Satria Adhityatama</title>
     <link>http://localhost:1313/categories/</link>
     <description>Recent content in Categories on Bakti Satria Adhityatama</description>
-    <generator>Hugo -- gohugo.io</generator>
-    <language>en-us</language><atom:link href="http://localhost:1313/categories/index.xml" rel="self" type="application/rss+xml" />
+    <generator>Hugo -- 0.147.7</generator>
+    <language>en-us</language>
+    <atom:link href="http://localhost:1313/categories/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>

@@ -1,7 +1,8 @@
 languageCode: en-us
 baseURL: "https://baktistr.github.io/"
 title: Bakti Satria Adhityatama
-paginate: 5
+pagination:
+  pagerSize: 10
 theme: PaperMod
 
 enableRobotsTXT: true
