@@ -21,17 +21,15 @@ Welcome to **Blog & Portfolio Website**. here I Write anything about **_Cyber Se
 
 ## Professional Works and Experiences
 
-- 2014 - Student Intern at Lussa, a local software house company in Bandung
+- 2024-now - Cyber Security Solution Engineer at Telkom Indonesia
 
-- 2015 - Student Intern at Central bank of Indonesia
-
-- 2016 - Backend Developer at Meridian.id a local software house company in Bandung
-
-- 2017-2019 - IT & Asset Database officer at Telkom Indonesia's Asset Management Center Unit
+- 2023-now - Data Scientist at Telkom Indonesia' Department of Digital Business
 
 - 2020-2022 - Asset Insurance & Physical Security Engineer at Telkom Indonesia's Asset Management Center Unit
 
-- 2023-now - Data Scientist at Telkom Indonesia' Department of Digital Business
+- 2017-2019 - IT & Asset Database officer at Telkom Indonesia's Asset Management Center Unit
+
+- 2016 - Backend Developer at Meridian.id a local software house company in Bandung
 
 
 ## Research Interest
