@@ -9,6 +9,10 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'My Blog',
+			favicon: '/logo_blog.png',
+			logo: {
+				src: './public/logo_blog.png',
+			},
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/baktistr' }
 			],
