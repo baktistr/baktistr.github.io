@@ -1,0 +1,109 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostCard from '../../components/blog/PostCard.astro';
+
+export async function getStaticPaths() {
+  const blogPosts = await getCollection('blog');
+  const docsPosts = await getCollection('docs');
+
+  // Collect all unique tags
+  const allTags = new Set<string>();
+
+  blogPosts
+    .filter((post) => !post.data.draft)
+    .forEach((post) => {
+      post.data.tags.forEach((tag) => allTags.add(tag));
+    });
+
+  docsPosts
+    .filter((post) => !post.data.draft)
+    .forEach((post) => {
+      post.data.tags.forEach((tag) => allTags.add(tag));
+    });
+
+  // Generate a page for each tag
+  return Array.from(allTags).map((tag) => ({
+    params: { tag },
+    props: { tag },
+  }));
+}
+
+interface Props {
+  tag: string;
+}
+
+const { tag } = Astro.props;
+
+// Get all posts with this tag
+const blogPosts = await getCollection('blog');
+const docsPosts = await getCollection('docs');
+
+const filteredBlogPosts = blogPosts
+  .filter((post) => !post.data.draft && post.data.tags.includes(tag))
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+
+const filteredDocsPosts = docsPosts
+  .filter((post) => !post.data.draft && post.data.tags.includes(tag))
+  .sort((a, b) => a.data.title.localeCompare(b.data.title));
+---
+
+<BaseLayout title={`Tag: ${tag}`} description={`All posts tagged with ${tag}`}>
+  <div class="max-w-4xl mx-auto">
+    <header class="mb-12">
+      <a
+        href="/tags"
+        class="inline-flex items-center gap-2 text-sm text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors mb-4"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+        All Tags
+      </a>
+      <h1 class="text-3xl md:text-4xl font-bold text-slate-100 light:text-slate-900 mb-4">
+        Tag: <span class="text-cyan-400 light:text-cyan-600">{tag}</span>
+      </h1>
+      <p class="text-lg text-slate-400 light:text-slate-600">
+        {filteredBlogPosts.length + filteredDocsPosts.length} post{filteredBlogPosts.length + filteredDocsPosts.length !== 1 ? 's' : ''} found
+      </p>
+    </header>
+
+    {filteredBlogPosts.length > 0 && (
+      <section class="mb-12">
+        <h2 class="text-xl font-bold text-slate-100 light:text-slate-900 mb-6">Blog Posts</h2>
+        <div class="space-y-6">
+          {filteredBlogPosts.map((post) => (
+            <PostCard post={post} />
+          ))}
+        </div>
+      </section>
+    )}
+
+    {filteredDocsPosts.length > 0 && (
+      <section class="mb-12">
+        <h2 class="text-xl font-bold text-slate-100 light:text-slate-900 mb-6">Documentation</h2>
+        <div class="space-y-4">
+          {filteredDocsPosts.map((post) => (
+            <a
+              href={`/docs/${post.slug}`}
+              class="block p-4 rounded-lg bg-slate-900 light:bg-white border border-slate-800 light:border-slate-200 hover:border-cyan-400 light:hover:border-cyan-600 transition-colors"
+            >
+              <h3 class="font-semibold text-slate-100 light:text-slate-900 mb-1">
+                {post.data.title}
+              </h3>
+              <p class="text-sm text-slate-400 light:text-slate-600">
+                {post.data.description}
+              </p>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    {filteredBlogPosts.length === 0 && filteredDocsPosts.length === 0 && (
+      <div class="text-center py-12">
+        <p class="text-slate-500 light:text-slate-400">No posts found with this tag.</p>
+      </div>
+    )}
+  </div>
+</BaseLayout>

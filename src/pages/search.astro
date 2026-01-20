@@ -1,0 +1,284 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+// Get all content at build time
+const blogPosts = await getCollection('blog');
+const docsPosts = await getCollection('docs');
+const projectPosts = await getCollection('projects');
+
+// Prepare searchable content as JSON for client-side search
+const allContent = [
+  ...blogPosts
+    .filter((post) => !post.data.draft)
+    .map((post) => ({
+      type: 'blog',
+      title: post.data.title,
+      description: post.data.description,
+      url: `/blog/${post.slug}`,
+      tags: post.data.tags,
+    })),
+  ...docsPosts
+    .filter((post) => !post.data.draft)
+    .map((post) => ({
+      type: 'docs',
+      title: post.data.title,
+      description: post.data.description,
+      url: `/docs/${post.slug}`,
+      tags: post.data.tags,
+      category: post.data.category,
+    })),
+  ...projectPosts
+    .filter((project) => !project.data.draft)
+    .map((project) => ({
+      type: 'project',
+      title: project.data.title,
+      description: project.data.description,
+      url: `/projects/${project.slug}`,
+      tags: project.data.tags,
+      status: project.data.status,
+    })),
+];
+---
+
+<BaseLayout title="Search" description="Search the site">
+  <div class="max-w-4xl mx-auto">
+    <header class="mb-8">
+      <h1 class="text-3xl md:text-4xl font-bold text-slate-100 light:text-slate-900 mb-6">
+        Search
+      </h1>
+
+      <form id="search-form" class="relative">
+        <input
+          type="search"
+          id="search-query"
+          name="q"
+          placeholder="Search docs, blog posts, and projects..."
+          class="w-full px-4 py-3 pl-12 rounded-lg bg-slate-900 light:bg-white border border-slate-800 light:border-slate-200 text-slate-100 light:text-slate-900 placeholder-slate-500 light:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 light:focus:ring-cyan-600 focus:border-transparent text-lg"
+          autofocus
+        />
+        <svg
+          class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 light:text-slate-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          />
+        </svg>
+        <button
+          type="submit"
+          class="absolute right-3 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-md bg-cyan-400 light:bg-cyan-600 text-slate-900 light:text-white font-medium hover:bg-cyan-500 light:hover:bg-cyan-700 transition-colors"
+        >
+          Search
+        </button>
+      </form>
+    </header>
+
+    <p id="result-count" class="text-slate-400 light:text-slate-600 mb-8 hidden"></p>
+
+    <div id="search-results" class="space-y-4"></div>
+
+    <div id="no-results" class="hidden bg-slate-900/50 light:bg-white border border-slate-800 light:border-slate-200 rounded-lg p-8 text-center">
+      <svg
+        class="w-16 h-16 mx-auto text-slate-600 light:text-slate-400 mb-4"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+      <p class="text-slate-400 light:text-slate-600 mb-2">No results found</p>
+      <p class="text-sm text-slate-500 light:text-slate-400">
+        Try different keywords or check your spelling
+      </p>
+    </div>
+
+    <div id="empty-state" class="bg-slate-900/50 light:bg-white border border-slate-800 light:border-slate-200 rounded-lg p-8 text-center">
+      <svg
+        class="w-16 h-16 mx-auto text-slate-600 light:text-slate-400 mb-4"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+        />
+      </svg>
+      <p class="text-slate-400 light:text-slate-600">
+        Enter a search term to find docs, blog posts, and projects
+      </p>
+    </div>
+  </div>
+</BaseLayout>
+
+<script define:vars={{ allContent }}>
+  const searchContent = allContent;
+
+  function getTypeStyles(type) {
+    switch (type) {
+      case 'blog':
+        return 'bg-emerald-500/20 text-emerald-400';
+      case 'project':
+        return 'bg-amber-500/20 text-amber-400';
+      default:
+        return 'bg-cyan-400/20 text-cyan-400';
+    }
+  }
+
+  function getTypeLabel(type) {
+    switch (type) {
+      case 'blog':
+        return 'Blog';
+      case 'project':
+        return 'Project';
+      default:
+        return 'Docs';
+    }
+  }
+
+  function search(query) {
+    if (!query.trim()) return [];
+
+    const searchTerms = query.toLowerCase().split(/\s+/);
+
+    return searchContent
+      .map((item) => {
+        const extraText = item.type === 'docs' ? (item.category || '') :
+                          item.type === 'project' ? (item.status || '') : '';
+        const searchableText = [
+          item.title,
+          item.description,
+          ...item.tags,
+          extraText,
+        ].join(' ').toLowerCase();
+
+        let score = 0;
+        for (const term of searchTerms) {
+          if (item.title.toLowerCase().includes(term)) score += 10;
+          if (item.description.toLowerCase().includes(term)) score += 5;
+          if (item.tags.some((tag) => tag.toLowerCase().includes(term))) score += 3;
+          if (searchableText.includes(term)) score += 1;
+        }
+
+        return { ...item, score };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score);
+  }
+
+  function renderResults(results, query) {
+    const resultsContainer = document.getElementById('search-results');
+    const resultCount = document.getElementById('result-count');
+    const noResults = document.getElementById('no-results');
+    const emptyState = document.getElementById('empty-state');
+
+    resultsContainer.innerHTML = '';
+    emptyState.classList.add('hidden');
+    noResults.classList.add('hidden');
+    resultCount.classList.add('hidden');
+
+    if (!query.trim()) {
+      emptyState.classList.remove('hidden');
+      return;
+    }
+
+    if (results.length === 0) {
+      noResults.classList.remove('hidden');
+      return;
+    }
+
+    resultCount.innerHTML = `${results.length} result${results.length !== 1 ? 's' : ''} for "<span class="text-cyan-400">${query}</span>"`;
+    resultCount.classList.remove('hidden');
+
+    results.forEach((result) => {
+      const article = document.createElement('a');
+      article.href = result.url;
+      article.className = 'block p-4 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-400 transition-colors';
+
+      const typeLabel = getTypeLabel(result.type);
+      const typeStyles = getTypeStyles(result.type);
+      const extraInfo = result.type === 'docs' && result.category
+        ? `<span class="text-xs text-slate-500">${result.category}</span>`
+        : result.type === 'project' && result.status
+        ? `<span class="text-xs text-slate-500 capitalize">${result.status}</span>`
+        : '';
+
+      const tagsHtml = result.tags.slice(0, 4).map((tag) =>
+        `<span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400">${tag}</span>`
+      ).join('');
+
+      article.innerHTML = `
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xs px-2 py-0.5 rounded ${typeStyles}">${typeLabel}</span>
+          ${extraInfo}
+        </div>
+        <h2 class="font-semibold text-slate-100 mb-1">${result.title}</h2>
+        <p class="text-sm text-slate-400 line-clamp-2">${result.description}</p>
+        ${result.tags.length > 0 ? `<div class="flex flex-wrap gap-2 mt-3">${tagsHtml}</div>` : ''}
+      `;
+
+      resultsContainer.appendChild(article);
+    });
+  }
+
+  function init() {
+    const searchInput = document.getElementById('search-query');
+    const searchForm = document.getElementById('search-form');
+
+    // Check for query param on page load
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialQuery = urlParams.get('q') || '';
+
+    if (initialQuery) {
+      searchInput.value = initialQuery;
+      const results = search(initialQuery);
+      renderResults(results, initialQuery);
+    }
+
+    // Handle form submit
+    searchForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const query = searchInput.value;
+      const results = search(query);
+      renderResults(results, query);
+
+      // Update URL without reload
+      const newUrl = query ? `?q=${encodeURIComponent(query)}` : window.location.pathname;
+      history.pushState({}, '', newUrl);
+    });
+
+    // Live search as user types (debounced)
+    let debounceTimer;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const query = searchInput.value;
+        const results = search(query);
+        renderResults(results, query);
+      }, 200);
+    });
+  }
+
+  // Initialize on DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  // Also handle Astro page transitions
+  document.addEventListener('astro:page-load', init);
+</script>

@@ -1,0 +1,134 @@
+---
+title: "Nmap Cheatsheet"
+description: "Quick reference for Nmap scanning techniques and commands"
+category: "Tools"
+order: 1
+tags: ["nmap", "scanning", "reconnaissance", "cheatsheet"]
+---
+
+import Callout from '../../../components/ui/Callout.astro';
+
+# Nmap Cheatsheet
+
+Nmap is the industry standard for network scanning and reconnaissance.
+
+## Basic Scans
+
+### TCP Connect Scan
+```bash
+nmap -sT target.com
+```
+
+### SYN Scan (Stealth)
+```bash
+nmap -sS target.com
+```
+
+### UDP Scan
+```bash
+nmap -sU target.com
+```
+
+## Service Detection
+
+### Version Detection
+```bash
+nmap -sV target.com
+```
+
+### Aggressive Scan
+```bash
+nmap -A target.com
+```
+
+## Script Scanning
+
+### Default Scripts
+```bash
+nmap -sC target.com
+```
+
+### Specific Script
+```bash
+nmap --script vuln target.com
+```
+
+### Script Categories
+```bash
+nmap --script auth,discovery target.com
+```
+
+## Output Formats
+
+### Normal Output
+```bash
+nmap -oN output.txt target.com
+```
+
+### XML Output
+```bash
+nmap -oX output.xml target.com
+```
+
+### Grepable Output
+```bash
+nmap -oG output.gnmap target.com
+```
+
+### All Formats
+```bash
+nmap -oA output target.com
+```
+
+## Common Options
+
+### Port Specification
+```bash
+nmap -p 1-1000 target.com       # Port range
+nmap -p- target.com              # All ports
+nmap -p 80,443,8080 target.com   # Specific ports
+```
+
+### Timing Templates
+```bash
+nmap -T0 target.com  # Paranoid (very slow)
+nmap -T1 target.com  # Sneaky
+nmap -T2 target.com  # Polite
+nmap -T3 target.com  # Normal (default)
+nmap -T4 target.com  # Aggressive
+nmap -T5 target.com  # Insane (may miss results)
+```
+
+### Verbosity
+```bash
+nmap -v target.com   # Verbose
+nmap -vv target.com  # Very verbose
+```
+
+## Useful Combinations
+
+### Quick Recon
+```bash
+nmap -T4 -sV --top-ports 100 target.com
+```
+
+### Comprehensive Scan
+```bash
+nmap -p- -sV -sC -O -T4 target.com
+```
+
+### Stealthy Scan
+```bash
+nmap -sS -T1 -f --data-length 24 target.com
+```
+
+## Tips
+
+- Use `-Pn` to skip host discovery (when ping is blocked)
+- Add `-vv` for more detailed output
+- Use `--source-port` to manipulate source port
+- Combine with `--script` for automated vulnerability detection
+
+<Callout type="info">
+Always ensure you have permission before scanning networks or systems. Unauthorized scanning is illegal in most jurisdictions.
+</Callout>

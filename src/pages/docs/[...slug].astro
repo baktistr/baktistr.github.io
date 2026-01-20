@@ -1,0 +1,53 @@
+---
+import { getCollection, type CollectionEntry } from 'astro:content';
+import DocsLayout from '../../layouts/DocsLayout.astro';
+
+export async function getStaticPaths() {
+  const docs = await getCollection('docs');
+  return docs.map((doc) => ({
+    params: { slug: doc.slug },
+    props: { doc },
+  }));
+}
+
+interface Props {
+  doc: CollectionEntry<'docs'>;
+}
+
+const { doc } = Astro.props;
+const { Content, headings } = await doc.render();
+
+// Build breadcrumbs from slug
+const slugParts = doc.slug.split('/');
+const breadcrumbs = slugParts.map((part, index) => ({
+  name: part.charAt(0).toUpperCase() + part.slice(1).replace(/-/g, ' '),
+  href: `/docs/${slugParts.slice(0, index + 1).join('/')}`,
+}));
+
+// Get all docs for prev/next navigation
+const allDocs = await getCollection('docs');
+const sortedDocs = allDocs
+  .filter((d) => !d.data.draft)
+  .sort((a, b) => {
+    // Sort by category first, then by order
+    if (a.data.category !== b.data.category) {
+      return a.data.category.localeCompare(b.data.category);
+    }
+    return a.data.order - b.data.order;
+  });
+
+const currentIndex = sortedDocs.findIndex((d) => d.slug === doc.slug);
+const prev = currentIndex > 0 ? sortedDocs[currentIndex - 1] : undefined;
+const next = currentIndex < sortedDocs.length - 1 ? sortedDocs[currentIndex + 1] : undefined;
+---
+
+<DocsLayout
+  title={doc.data.title}
+  description={doc.data.description}
+  headings={headings}
+  breadcrumbs={breadcrumbs}
+  prev={prev ? { title: prev.data.title, slug: prev.slug } : undefined}
+  next={next ? { title: next.data.title, slug: next.slug } : undefined}
+>
+  <Content />
+</DocsLayout>

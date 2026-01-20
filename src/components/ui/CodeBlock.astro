@@ -1,0 +1,53 @@
+---
+interface Props {
+  code: string;
+  language?: string;
+  title?: string;
+}
+
+const { code, language = 'text', title } = Astro.props;
+---
+
+<div class="code-block group relative mb-4">
+  {title && (
+    <div class="flex items-center justify-between px-4 py-2 bg-slate-900 light:bg-slate-100 border border-b-0 border-slate-800 light:border-slate-200 rounded-t-lg">
+      <span class="text-sm text-slate-400 light:text-slate-600">{title}</span>
+      <button
+        class="copy-btn px-2 py-1 text-xs text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+        data-code={code}
+      >
+        Copy
+      </button>
+    </div>
+  )}
+  <pre
+    class={`p-4 rounded-lg overflow-x-auto bg-slate-900 light:bg-slate-100 border border-slate-800 light:border-slate-200 ${
+      title ? 'rounded-t-none' : ''
+    }`}
+  ><code is:raw class={`language-${language} text-slate-100 light:text-slate-900`}>{code}</code></pre>
+</div>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const copyBtns = document.querySelectorAll('.copy-btn');
+    copyBtns.forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const codeToCopy = btn.getAttribute('data-code');
+        if (codeToCopy) {
+          try {
+            await navigator.clipboard.writeText(codeToCopy);
+            btn.textContent = 'Copied!';
+            setTimeout(() => {
+              btn.textContent = 'Copy';
+            }, 2000);
+          } catch {
+            btn.textContent = 'Failed';
+            setTimeout(() => {
+              btn.textContent = 'Copy';
+            }, 2000);
+          }
+        }
+      });
+    });
+  });
+</script>

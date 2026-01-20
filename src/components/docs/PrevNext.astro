@@ -1,0 +1,39 @@
+---
+interface Props {
+  prev?: { title: string; slug: string };
+  next?: { title: string; slug: string };
+}
+
+const { prev, next } = Astro.props;
+---
+
+{prev || next ? (
+  <div class="flex justify-between gap-4 mt-12 pt-8 border-t border-slate-800 light:border-slate-200">
+    {prev ? (
+      <a
+        href={`/docs/${prev.slug}`}
+        class="flex-1 p-4 rounded-lg bg-slate-900/50 light:bg-white border border-slate-800 light:border-slate-200 hover:border-cyan-400/50 light:hover:border-cyan-600/50 transition-colors group"
+      >
+        <div class="text-xs text-slate-500 mb-1">Previous</div>
+        <div class="font-medium text-slate-300 light:text-slate-700 group-hover:text-cyan-400 light:group-hover:text-cyan-600 transition-colors">
+          {prev.title}
+        </div>
+      </a>
+    ) : (
+      <div class="flex-1" />
+    )}
+    {next ? (
+      <a
+        href={`/docs/${next.slug}`}
+        class="flex-1 p-4 rounded-lg bg-slate-900/50 light:bg-white border border-slate-800 light:border-slate-200 hover:border-cyan-400/50 light:hover:border-cyan-600/50 transition-colors group text-right"
+      >
+        <div class="text-xs text-slate-500 mb-1">Next</div>
+        <div class="font-medium text-slate-300 light:text-slate-700 group-hover:text-cyan-400 light:group-hover:text-cyan-600 transition-colors">
+          {next.title}
+        </div>
+      </a>
+    ) : (
+      <div class="flex-1" />
+    )}
+  </div>
+) : null}

@@ -1,0 +1,136 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+const recentPosts = (await getCollection('blog'))
+  .filter((post) => !post.data.draft)
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+  .slice(0, 3);
+
+const recentDocs = (await getCollection('docs'))
+  .filter((doc) => !doc.data.draft)
+  .sort((a, b) => (b.data.updated?.valueOf() ?? 0) - (a.data.updated?.valueOf() ?? 0))
+  .slice(0, 3);
+---
+
+<BaseLayout
+  title="Bakti Satria"
+  description="Personal blog and technical documentation for cybersecurity professionals"
+>
+  <div class="max-w-4xl mx-auto">
+    <!-- Hero Section -->
+    <section class="text-center py-12 md:py-20">
+      <h1 class="text-4xl md:text-5xl font-bold text-slate-100 light:text-slate-900 mb-6">
+        Security <span class="text-cyan-400 light:text-cyan-600">Blog & Docs</span>
+      </h1>
+      <p class="text-xl text-slate-400 light:text-slate-600 max-w-2xl mx-auto mb-8">
+        Technical writeups, cheatsheets, and guides for cybersecurity professionals.
+        Personal notes from my journey in offensive security.
+      </p>
+      <div class="flex flex-wrap justify-center gap-4">
+        <a
+          href="/docs"
+          class="px-6 py-3 bg-cyan-400 light:bg-cyan-600 text-slate-950 light:text-white font-semibold rounded-lg hover:bg-cyan-300 light:hover:bg-cyan-700 transition-colors"
+        >
+          Browse Docs
+        </a>
+        <a
+          href="/blog"
+          class="px-6 py-3 border border-slate-700 light:border-slate-300 text-slate-300 light:text-slate-700 font-semibold rounded-lg hover:border-cyan-400 light:hover:border-cyan-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+        >
+          Read Blog
+        </a>
+      </div>
+    </section>
+
+    <!-- Content Sections -->
+    <div class="grid md:grid-cols-2 gap-8 py-12">
+      <!-- Docs Section -->
+      <section>
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-2xl font-bold text-slate-100 light:text-slate-900">Documentation</h2>
+          <a href="/docs" class="text-sm text-cyan-400 light:text-cyan-600 hover:underline">View all</a>
+        </div>
+        <div class="space-y-4">
+          <a
+            href="/docs/oscp/buffer-overflow"
+            class="block p-4 bg-slate-900/50 light:bg-white border border-slate-800 light:border-slate-200 rounded-lg hover:border-cyan-400/50 light:hover:border-cyan-600/50 transition-colors"
+          >
+            <h3 class="font-semibold text-slate-200 light:text-slate-800 mb-1">Buffer Overflow</h3>
+            <p class="text-sm text-slate-400 light:text-slate-600">OSCP buffer overflow techniques</p>
+          </a>
+          <a
+            href="/docs/tools/nmap-cheatsheet"
+            class="block p-4 bg-slate-900/50 light:bg-white border border-slate-800 light:border-slate-200 rounded-lg hover:border-cyan-400/50 light:hover:border-cyan-600/50 transition-colors"
+          >
+            <h3 class="font-semibold text-slate-200 light:text-slate-800 mb-1">Nmap Cheatsheet</h3>
+            <p class="text-sm text-slate-400 light:text-slate-600">Quick reference for network scanning</p>
+          </a>
+          <a
+            href="/docs/methodology/network-pentest"
+            class="block p-4 bg-slate-900/50 light:bg-white border border-slate-800 light:border-slate-200 rounded-lg hover:border-cyan-400/50 light:hover:border-cyan-600/50 transition-colors"
+          >
+            <h3 class="font-semibold text-slate-200 light:text-slate-800 mb-1">Network Pentesting</h3>
+            <p class="text-sm text-slate-400 light:text-slate-600">Methodology for network assessments</p>
+          </a>
+        </div>
+      </section>
+
+      <!-- Blog Section -->
+      <section>
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-2xl font-bold text-slate-100 light:text-slate-900">Latest Posts</h2>
+          <a href="/blog" class="text-sm text-cyan-400 light:text-cyan-600 hover:underline">View all</a>
+        </div>
+        <div class="space-y-4">
+          {recentPosts.length > 0 ? (
+            recentPosts.map((post) => (
+              <a
+                href={`/blog/${post.slug}`}
+                class="block p-4 bg-slate-900/50 light:bg-white border border-slate-800 light:border-slate-200 rounded-lg hover:border-cyan-400/50 light:hover:border-cyan-600/50 transition-colors"
+              >
+                <h3 class="font-semibold text-slate-200 light:text-slate-800 mb-1">{post.data.title}</h3>
+                <p class="text-sm text-slate-400 light:text-slate-600 line-clamp-2">{post.data.description}</p>
+              </a>
+            ))
+          ) : (
+            <div class="p-4 bg-slate-900/50 light:bg-white border border-slate-800 light:border-slate-200 rounded-lg text-center">
+              <p class="text-slate-400 light:text-slate-600">No blog posts yet. Check back soon!</p>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+
+    <!-- Categories Overview -->
+    <section class="py-12 border-t border-slate-800 light:border-slate-200">
+      <h2 class="text-2xl font-bold text-slate-100 light:text-slate-900 mb-6 text-center">Documentation Categories</h2>
+      <div class="grid sm:grid-cols-3 gap-6">
+        <a
+          href="/docs"
+          class="p-6 bg-slate-900/50 light:bg-white border border-slate-800 light:border-slate-200 rounded-lg hover:border-cyan-400/50 light:hover:border-cyan-600/50 transition-colors text-center"
+        >
+          <div class="text-3xl mb-3">🎯</div>
+          <h3 class="font-semibold text-slate-200 light:text-slate-800 mb-2">OSCP</h3>
+          <p class="text-sm text-slate-400 light:text-slate-600">Exam prep notes and techniques</p>
+        </a>
+        <a
+          href="/docs"
+          class="p-6 bg-slate-900/50 light:bg-white border border-slate-800 light:border-slate-200 rounded-lg hover:border-cyan-400/50 light:hover:border-cyan-600/50 transition-colors text-center"
+        >
+          <div class="text-3xl mb-3">🛠️</div>
+          <h3 class="font-semibold text-slate-200 light:text-slate-800 mb-2">Tools</h3>
+          <p class="text-sm text-slate-400 light:text-slate-600">Cheatsheets and quick references</p>
+        </a>
+        <a
+          href="/docs"
+          class="p-6 bg-slate-900/50 light:bg-white border border-slate-800 light:border-slate-200 rounded-lg hover:border-cyan-400/50 light:hover:border-cyan-600/50 transition-colors text-center"
+        >
+          <div class="text-3xl mb-3">📋</div>
+          <h3 class="font-semibold text-slate-200 light:text-slate-800 mb-2">Methodology</h3>
+          <p class="text-sm text-slate-400 light:text-slate-600">Pentesting approaches and frameworks</p>
+        </a>
+      </div>
+    </section>
+  </div>
+</BaseLayout>

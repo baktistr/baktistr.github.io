@@ -1,0 +1,67 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+// Get all posts from both collections
+const blogPosts = await getCollection('blog');
+const docsPosts = await getCollection('docs');
+
+// Extract all tags and count occurrences
+const tagCounts = new Map<string, number>();
+
+blogPosts
+  .filter((post) => !post.data.draft)
+  .forEach((post) => {
+    post.data.tags.forEach((tag) => {
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+    });
+  });
+
+docsPosts
+  .filter((post) => !post.data.draft)
+  .forEach((post) => {
+    post.data.tags.forEach((tag) => {
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+    });
+  });
+
+// Sort tags alphabetically
+const sortedTags = Array.from(tagCounts.entries()).sort((a, b) =>
+  a[0].localeCompare(b[0])
+);
+---
+
+<BaseLayout title="Tags" description="Browse all tags">
+  <div class="max-w-4xl mx-auto">
+    <header class="mb-12">
+      <h1 class="text-3xl md:text-4xl font-bold text-slate-100 light:text-slate-900 mb-4">
+        Tags
+      </h1>
+      <p class="text-lg text-slate-400 light:text-slate-600">
+        Browse content by topic. Click a tag to see all related posts.
+      </p>
+    </header>
+
+    {sortedTags.length > 0 ? (
+      <div class="flex flex-wrap gap-3">
+        {sortedTags.map(([tag, count]) => (
+          <a
+            href={`/tags/${tag}`}
+            class="group inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 light:bg-white border border-slate-800 light:border-slate-200 hover:border-cyan-400 light:hover:border-cyan-600 transition-colors"
+          >
+            <span class="text-slate-100 light:text-slate-900 group-hover:text-cyan-400 light:group-hover:text-cyan-600 transition-colors">
+              {tag}
+            </span>
+            <span class="text-sm text-slate-500 light:text-slate-400">
+              ({count})
+            </span>
+          </a>
+        ))}
+      </div>
+    ) : (
+      <div class="text-center py-12">
+        <p class="text-slate-500 light:text-slate-400">No tags found.</p>
+      </div>
+    )}
+  </div>
+</BaseLayout>

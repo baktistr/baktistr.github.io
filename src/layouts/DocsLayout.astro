@@ -1,0 +1,41 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import DocsSidebar from '../components/docs/DocsSidebar.astro';
+import TableOfContents from '../components/docs/TableOfContents.astro';
+import Breadcrumb from '../components/docs/Breadcrumb.astro';
+import PrevNext from '../components/docs/PrevNext.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+  headings?: Array<{ depth: number; slug: string; text: string }>;
+  currentHeading?: string;
+  breadcrumbs?: Array<{ name: string; href: string }>;
+  prev?: { title: string; slug: string };
+  next?: { title: string; slug: string };
+}
+
+const {
+  title,
+  description = 'Documentation',
+  headings = [],
+  currentHeading = '',
+  breadcrumbs = [],
+  prev,
+  next,
+} = Astro.props;
+---
+
+<BaseLayout title={`${title} | Docs`} description={description}>
+  <div class="flex gap-8">
+    <DocsSidebar />
+    <div class="flex-1 min-w-0 max-w-3xl">
+      <Breadcrumb segments={breadcrumbs} />
+      <article class="prose prose-slate">
+        <slot />
+      </article>
+      <PrevNext prev={prev} next={next} />
+    </div>
+    <TableOfContents headings={headings} currentHeading={currentHeading} />
+  </div>
+</BaseLayout>

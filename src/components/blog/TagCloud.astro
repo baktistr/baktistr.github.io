@@ -1,0 +1,27 @@
+---
+import { getCollection } from 'astro:content';
+
+const allPosts = await getCollection('blog');
+const tagCounts = allPosts
+  .filter((post) => !post.data.draft)
+  .flatMap((post) => post.data.tags)
+  .reduce((acc, tag) => {
+    acc[tag] = (acc[tag] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+const sortedTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]);
+---
+
+<div class="flex flex-wrap gap-2">
+  {sortedTags.map(([tag, count]) => (
+    <a
+      href={`/tags/${tag}`}
+      class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-900/50 border border-slate-800 text-slate-400 hover:text-cyan-400 hover:border-cyan-400/50 transition-colors text-sm"
+    >
+      <span>#{tag}</span>
+      <span class="text-xs text-slate-500">({count})</span>
+    </a>
+  ))}
+</div>
+

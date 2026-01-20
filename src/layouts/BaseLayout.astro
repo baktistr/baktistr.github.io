@@ -1,0 +1,101 @@
+---
+import '../styles/global.css';
+import ThemeToggle from '../components/ui/ThemeToggle.astro';
+import Search from '../components/ui/Search.astro';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = 'Bakti Satria',
+  description = 'Personal blog and technical documentation for cybersecurity professionals',
+} = Astro.props;
+
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content={description} />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/png" href="/logo_blog.png" />
+    <link rel="canonical" href={canonicalURL} />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <title>{title}</title>
+  </head>
+  <body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 light:bg-slate-50 light:text-slate-900">
+    <header class="sticky top-0 z-50 w-full border-b border-slate-800 light:border-slate-200 bg-slate-950/80 light:bg-white/80 backdrop-blur">
+      <div class="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-8">
+          <a href="/" class="flex items-center gap-2 group">
+            <img src="/logo_blog.png" alt="Logo" class="h-8 w-auto" />
+            <span class="font-bold text-slate-100 light:text-slate-900 group-hover:text-cyan-400 light:group-hover:text-cyan-600 transition-colors">
+              Bakti Satria
+            </span>
+          </a>
+          <nav class="hidden md:flex items-center gap-6">
+            <a
+              href="/docs"
+              class="text-sm text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+            >
+              Docs
+            </a>
+            <a
+              href="/blog"
+              class="text-sm text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+            >
+              Blog
+            </a>
+            <a
+              href="/projects"
+              class="text-sm text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+            >
+              Projects
+            </a>
+            <a
+              href="/about"
+              class="text-sm text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+            >
+              About
+            </a>
+            <a
+              href="/tags"
+              class="text-sm text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+            >
+              Tags
+            </a>
+          </nav>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="hidden sm:block w-48">
+            <Search />
+          </div>
+          <ThemeToggle />
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 container mx-auto px-4 py-8">
+      <slot />
+    </main>
+
+    <footer class="border-t border-slate-800 light:border-slate-200 py-8 mt-auto">
+      <div class="container mx-auto px-4 text-center text-sm text-slate-500 light:text-slate-600">
+        <p>&copy; {new Date().getFullYear()} Bakti Satria. All rights reserved.</p>
+      </div>
+    </footer>
+  </body>
+</html>

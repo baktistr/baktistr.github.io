@@ -1,0 +1,66 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import DocsSidebar from '../../components/docs/DocsSidebar.astro';
+
+const allDocs = await getCollection('docs');
+const docsByCategory = allDocs
+  .filter((doc) => !doc.data.draft)
+  .reduce((acc, doc) => {
+    const category = doc.data.category;
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(doc);
+    return acc;
+  }, {} as Record<string, typeof allDocs>);
+
+// Sort categories and docs
+const sortedCategories = Object.keys(docsByCategory).sort();
+for (const category in docsByCategory) {
+  docsByCategory[category].sort((a, b) => a.data.order - b.data.order);
+}
+---
+
+<BaseLayout title="Documentation" description="Technical documentation, cheatsheets, and guides">
+  <div class="flex gap-8">
+    <DocsSidebar />
+    <div class="flex-1 min-w-0 max-w-4xl">
+      <header class="mb-12">
+        <h1 class="text-3xl md:text-4xl font-bold text-slate-100 light:text-slate-900 mb-4">Documentation</h1>
+        <p class="text-lg text-slate-400 light:text-slate-600">
+          Technical writeups, cheatsheets, and guides for cybersecurity professionals.
+        </p>
+      </header>
+
+      <div class="space-y-12">
+        {sortedCategories.map((category) => (
+          <section>
+            <h2 class="text-xl font-bold text-slate-200 light:text-slate-800 mb-4 pb-2 border-b border-slate-800 light:border-slate-200">
+              {category}
+            </h2>
+            <div class="grid gap-4 sm:grid-cols-2">
+              {docsByCategory[category].map((doc) => (
+                <a
+                  href={`/docs/${doc.slug}`}
+                  class="group p-4 rounded-lg bg-slate-900/50 light:bg-white border border-slate-800 light:border-slate-200 hover:border-cyan-400/50 light:hover:border-cyan-600/50 transition-all"
+                >
+                  <h3 class="font-semibold text-slate-100 light:text-slate-900 group-hover:text-cyan-400 light:group-hover:text-cyan-600 transition-colors mb-1">
+                    {doc.data.title}
+                  </h3>
+                  <p class="text-sm text-slate-400 light:text-slate-600 line-clamp-2">{doc.data.description}</p>
+                </a>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {sortedCategories.length === 0 && (
+        <div class="text-center py-12">
+          <p class="text-slate-500 light:text-slate-400">No documentation yet. Check back soon!</p>
+        </div>
+      )}
+    </div>
+  </div>
+</BaseLayout>

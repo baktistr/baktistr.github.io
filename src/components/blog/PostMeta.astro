@@ -1,0 +1,32 @@
+---
+import { formatDate } from '../../lib/utils';
+import Badge from '../ui/Badge.astro';
+
+interface Props {
+  date: Date;
+  readingTime: number;
+  tags: string[];
+}
+
+const { date, readingTime, tags } = Astro.props;
+---
+
+<div class="flex flex-wrap items-center gap-3 text-sm text-slate-500 light:text-slate-500">
+  <time datetime={date.toISOString()}>{formatDate(date)}</time>
+  <span>-</span>
+  <span>{readingTime} min read</span>
+  {tags.length > 0 && (
+    <>
+      <span>-</span>
+      <div class="flex flex-wrap gap-2">
+        {tags.map((tag) => (
+          <a href={`/tags/${tag}`} class="hover:text-cyan-400 light:hover:text-cyan-600 transition-colors">
+            <Badge variant="default" size="sm">
+              #{tag}
+            </Badge>
+          </a>
+        ))}
+      </div>
+    </>
+  )}
+</div>

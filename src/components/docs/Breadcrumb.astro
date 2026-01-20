@@ -1,0 +1,23 @@
+---
+interface Props {
+  segments: Array<{ name: string; href: string }>;
+}
+
+const { segments } = Astro.props;
+---
+
+<nav class="flex items-center gap-2 text-sm text-slate-500 light:text-slate-500 mb-6">
+  <a href="/" class="hover:text-cyan-400 light:hover:text-cyan-600 transition-colors">Home</a>
+  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+  </svg>
+  <a href="/docs" class="hover:text-cyan-400 light:hover:text-cyan-600 transition-colors">Docs</a>
+  {segments.map((segment) => (
+    <>
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+      </svg>
+      <a href={segment.href} class="hover:text-cyan-400 light:hover:text-cyan-600 transition-colors">{segment.name}</a>
+    </>
+  ))}
+</nav>

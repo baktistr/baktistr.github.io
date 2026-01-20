@@ -1,0 +1,38 @@
+---
+interface Props {
+  headings: Array<{ depth: number; slug: string; text: string }>;
+  currentHeading: string;
+}
+
+const { headings, currentHeading } = Astro.props;
+
+const filteredHeadings = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
+---
+
+<aside class="hidden xl:block w-64 shrink-0 sticky top-20 h-[calc(100vh-5rem)] overflow-y-auto pl-4">
+  <nav class="space-y-2">
+    <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+      On this page
+    </h4>
+    <ul class="space-y-2 text-sm">
+      {filteredHeadings.map((heading) => (
+        <li
+          class={`transition-colors ${
+            heading.depth === 3 ? 'pl-4' : ''
+          } ${
+            currentHeading === heading.slug
+              ? 'text-cyan-400 light:text-cyan-600'
+              : 'text-slate-400 light:text-slate-600 hover:text-slate-300 light:hover:text-slate-500'
+          }`}
+        >
+          <a
+            href={`#${heading.slug}`}
+            class="block py-1 border-l-2 border-transparent hover:border-slate-700 light:hover:border-slate-300 pl-3 -ml-3"
+          >
+            {heading.text}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+</aside>
