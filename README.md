@@ -1,49 +1,80 @@
-# Starlight Starter Kit: Basics
+# Cybersecurity Blog & Documentation
 
-[![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
+Personal blog and technical documentation for cybersecurity writeups, guides, and notes.
+
+**Live:** https://baktistr.github.io
+
+---
+
+## Tech Stack
+
+| Component | Tool |
+|-----------|------|
+| Framework | Astro 5 |
+| Styling | Tailwind CSS v4 |
+| Content | MDX + Content Collections |
+| Search | Pagefind |
+| Deployment | GitHub Pages |
+| Package Manager | pnpm |
+
+---
+
+## Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Start dev server (localhost:4321)
+pnpm dev
+
+# Build for production
+pnpm build
+
+# Preview production build
+pnpm preview
+```
+
+---
+
+## Project Structure
 
 ```
-npm create astro@latest -- --template starlight
+src/
+├── components/        # Reusable UI components
+│   ├── ui/           # Base components (Button, Card, Badge)
+│   ├── docs/         # Docs-specific (Sidebar, TOC, Breadcrumb)
+│   └── blog/         # Blog-specific (PostCard, TagList)
+├── layouts/          # Page layouts
+├── pages/            # Routes
+├── content/          # MDX content
+│   ├── docs/         # Technical docs, guides, cheatsheets
+│   └── blog/         # Blog posts
+├── styles/           # Global styles
+└── lib/              # Utilities
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+---
 
-## 🚀 Project Structure
+## Content
 
-Inside of your Astro + Starlight project, you'll see the following folders and files:
+### Documentation
+- OSCP notes and methodologies
+- Pentesting tools cheatsheets
+- Lab writeups and CTF solutions
+- Technical guides
+
+### Blog
+- Learning journey updates
+- Career thoughts
+- Random technical posts
+
+---
+
+## Deployment
+
+Push to `main` branch triggers GitHub Actions workflow that builds and deploys to GitHub Pages.
 
 ```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   └── docs/
-│   └── content.config.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+.github/workflows/deploy.yml
 ```
-
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
-
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
-
-Static assets, like favicons, can be placed in the `public/` directory.
-
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
