@@ -8,9 +8,10 @@ interface Props {
   description?: string;
   pubDate: Date;
   tags: string[];
+  readingTime: number;
 }
 
-const { title, description, pubDate, tags } = Astro.props;
+const { title, description, pubDate, tags, readingTime } = Astro.props;
 ---
 
 <BaseLayout title={title} description={description}>
@@ -18,7 +19,7 @@ const { title, description, pubDate, tags } = Astro.props;
     <header class="mb-8">
       <h1 class="text-3xl md:text-4xl font-bold text-slate-100 light:text-slate-900 mb-4">{title}</h1>
       {description && <p class="text-xl text-slate-400 light:text-slate-600 mb-4">{description}</p>}
-      <PostMeta date={pubDate} readingTime={0} tags={tags} />
+      <PostMeta date={pubDate} readingTime={readingTime} tags={tags} />
     </header>
     <div class="prose max-w-none">
       <slot />
