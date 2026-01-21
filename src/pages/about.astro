@@ -1,18 +1,63 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import Badge from '../components/ui/Badge.astro';
-
-const skills = {
-  'Penetration Testing': ['Web Application Security', 'Network Penetration Testing', 'Active Directory Attacks', 'Vulnerability Assessment'],
-  'Tools & Technologies': ['Burp Suite', 'Nmap', 'Metasploit', 'Wireshark', 'Bloodhound', 'Cobalt Strike'],
-  'Programming': ['Python', 'Bash', 'PowerShell', 'JavaScript', 'Go'],
-  'Platforms': ['Linux', 'Windows Server', 'Docker', 'AWS', 'Azure'],
-};
 
 const certifications = [
-  { name: 'OSCP', full: 'Offensive Security Certified Professional', year: '2024' },
-  { name: 'CEH', full: 'Certified Ethical Hacker', year: '2023' },
-  { name: 'CompTIA Security+', full: 'CompTIA Security+', year: '2022' },
+  {
+    name: 'eWPTX',
+    full: 'eLearnSecurity Web Penetration Tester Extreme',
+    year: '2024',
+    url: 'https://certs.ine.com/916c36e0-2a5e-4701-bf8d-f3675c028742#acc.kHUGDIta'
+  },
+  {
+    name: 'AWS Solution Architect',
+    full: 'AWS Certified Solutions Architect – Associate',
+    year: '2023',
+    url: 'https://www.credly.com/badges/818a7d2e-a5c8-4f37-bbf9-1b7b1fa1f41f'
+  },
+  {
+    name: 'CIPM',
+    full: 'Certified Information Privacy Manager',
+    year: '2024',
+    url: 'https://www.credential.net/904ba3ae-8bb8-4fed-b7da-467761bda25e'
+  },
+];
+
+const education = [
+  {
+    degree: 'Master of Science in Privacy Engineering',
+    school: 'Carnegie Mellon University',
+    location: 'Pittsburgh, PA',
+    year: 'Aug 2025 - Dec 2026',
+    focus: 'Privacy Technology & Audit, Privacy Preserving Machine Learning (PPML)',
+  },
+  {
+    degree: "Master's in Electrical Engineering",
+    school: 'Institut Teknologi Bandung',
+    location: 'Bandung, Indonesia',
+    year: '2016 - 2017',
+    focus: 'Information Security Engineering & Management',
+  },
+  {
+    degree: "Bachelor’s in Electrical and Electronics Engineering",
+    school: 'Institut Teknologi Bandung',
+    location: 'Bandung, Indonesia',
+    year: '2012 - 2016',
+  },
+];
+
+const experience = [
+  {
+    title: 'Various Roles',
+    company: 'Telkom Indonesia',
+    location: 'Indonesia',
+    period: '2017 - Present',
+    description: 'Progressed through multiple technical roles from fullstack development to data science, ultimately specializing in cybersecurity solutions.',
+    highlights: [
+      'Started as Junior Fullstack Developer building web & mobile applications',
+      'Transitioned to Data Scientist working on AI & ML developments as well as analytics projects',
+      'Currently serving as Senior Cybersecurity Solution Engineer',
+    ],
+  },
 ];
 ---
 
@@ -27,18 +72,20 @@ const certifications = [
     <!-- Bio Section -->
     <section class="mb-12">
       <div class="flex flex-col md:flex-row gap-8 items-start">
-        <div class="w-32 h-32 rounded-full bg-gradient-to-br from-cyan-400 to-emerald-500 flex items-center justify-center text-4xl font-bold text-slate-900 shrink-0">
-          BS
-        </div>
+        <img
+          src="/me_pixelated.png"
+          alt="Profile"
+          class="w-32 h-32 rounded-full object-cover shrink-0 border-2 border-cyan-400"
+        />
         <div>
           <h2 class="text-2xl font-semibold text-slate-100 light:text-slate-900 mb-4">
             Cybersecurity Professional
           </h2>
           <div class="prose prose-invert light:prose prose-slate max-w-none text-slate-300 light:text-slate-600">
             <p>
-              I'm a passionate cybersecurity professional with a focus on offensive security and penetration testing.
-              My journey in security started with curiosity about how systems work and evolved into a career dedicated
-              to helping organizations identify and fix vulnerabilities before malicious actors can exploit them.
+              I'm a passionate cybersecurity and privacy engineer with a strong focus on offensive security and penetration testing.
+              My journey started with curiosity about how systems work and evolved into a career dedicated to helping organizations
+              identify and fix vulnerabilities before malicious actors can exploit them.
             </p>
             <p>
               When I'm not breaking into systems (legally), I enjoy participating in CTF competitions, contributing
@@ -54,47 +101,129 @@ const certifications = [
       </div>
     </section>
 
-    <!-- Skills Section -->
-    <section class="mb-12">
-      <h2 class="text-2xl font-semibold text-slate-100 light:text-slate-900 mb-6">
-        Skills & Expertise
-      </h2>
-      <div class="grid gap-6 md:grid-cols-2">
-        {Object.entries(skills).map(([category, items]) => (
-          <div class="p-5 rounded-lg bg-slate-900 light:bg-white border border-slate-800 light:border-slate-200">
-            <h3 class="font-medium text-slate-100 light:text-slate-900 mb-3">
-              {category}
-            </h3>
-            <div class="flex flex-wrap gap-2">
-              {items.map((skill) => (
-                <Badge>{skill}</Badge>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-
     <!-- Certifications Section -->
     <section class="mb-12">
       <h2 class="text-2xl font-semibold text-slate-100 light:text-slate-900 mb-6">
         Certifications
       </h2>
-      <div class="space-y-4">
+      <div class="grid gap-4 md:grid-cols-2">
         {certifications.map((cert) => (
-          <div class="flex items-center justify-between p-4 rounded-lg bg-slate-900 light:bg-white border border-slate-800 light:border-slate-200">
+          <a
+            href={cert.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center justify-between p-4 rounded-lg bg-slate-900 light:bg-white border border-slate-800 light:border-slate-200 hover:border-cyan-400/50 transition-colors group"
+          >
             <div class="flex items-center gap-4">
-              <div class="w-12 h-12 rounded-lg bg-cyan-400/20 flex items-center justify-center">
+              <div class="w-12 h-12 rounded-lg bg-cyan-400/20 flex items-center justify-center shrink-0">
                 <svg class="w-6 h-6 text-cyan-400 light:text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                 </svg>
               </div>
-              <div>
-                <span class="font-semibold text-slate-100 light:text-slate-900">{cert.name}</span>
-                <p class="text-sm text-slate-400 light:text-slate-600">{cert.full}</p>
+              <div class="min-w-0">
+                <span class="font-semibold text-slate-100 light:text-slate-900 block group-hover:text-cyan-400 transition-colors">{cert.name}</span>
+                <p class="text-sm text-slate-400 light:text-slate-600 truncate">{cert.full}</p>
               </div>
             </div>
-            <span class="text-sm text-slate-500 light:text-slate-400">{cert.year}</span>
+            <div class="text-right shrink-0">
+              <svg class="w-5 h-5 text-slate-500 group-hover:text-cyan-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <!-- Work Experience Section -->
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold text-slate-100 light:text-slate-900 mb-6">
+        Work Experience
+      </h2>
+      <div class="space-y-6">
+        {experience.map((exp) => (
+          <div class="p-6 rounded-lg bg-slate-900 light:bg-white border border-slate-800 light:border-slate-200 hover:border-cyan-400/30 transition-colors">
+            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-2 mb-3">
+              <div class="flex-1">
+                <h3 class="font-semibold text-slate-100 light:text-slate-900 text-lg">{exp.title}</h3>
+                <p class="text-cyan-400 light:text-cyan-600 font-medium">{exp.company}</p>
+                <div class="flex items-center gap-3 mt-2 text-sm text-slate-400 light:text-slate-600">
+                  <span class="flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    {exp.location}
+                  </span>
+                  <span>|</span>
+                  <span>{exp.period}</span>
+                </div>
+              </div>
+            </div>
+            <p class="text-slate-300 light:text-slate-600 mb-4">{exp.description}</p>
+            <ul class="space-y-2">
+              {exp.highlights.map((highlight) => (
+                <li class="flex items-start gap-2 text-sm text-slate-400 light:text-slate-600">
+                  <svg class="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {highlight}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Education Section -->
+    <section class="mb-12">
+      <h2 class="text-2xl font-semibold text-slate-100 light:text-slate-900 mb-6">
+        Education
+      </h2>
+      <div class="space-y-4">
+        {education.map((edu) => (
+          <div class="p-6 rounded-lg bg-slate-900 light:bg-white border border-slate-800 light:border-slate-200">
+            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3 mb-4">
+              <div class="flex-1">
+                <h3 class="font-semibold text-slate-100 light:text-slate-900 text-lg">{edu.degree}</h3>
+                <p class="text-cyan-400 light:text-cyan-600 font-medium">{edu.school}</p>
+                <div class="flex items-center gap-3 mt-2 text-sm text-slate-400 light:text-slate-600">
+                  <span class="flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    {edu.location}
+                  </span>
+                  <span>|</span>
+                  <span>{edu.year}</span>
+                  {edu.gpa && (
+                    <>
+                      <span>|</span>
+                      <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500 light:text-emerald-600">GPA: {edu.gpa}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+            {edu.coursework && (
+              <div>
+                <p class="text-sm text-slate-500 light:text-slate-500 mb-2">Relevant Coursework:</p>
+                <div class="flex flex-wrap gap-2">
+                  {edu.coursework.map((course) => (
+                    <span class="text-xs px-2 py-1 rounded bg-slate-800 light:bg-slate-200 text-slate-400 light:text-slate-600">
+                      {course}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {edu.focus && (
+              <p class="text-sm text-slate-400 light:text-slate-600 mt-2">
+                <span class="text-slate-500">Focus:</span> {edu.focus}
+              </p>
+            )}
           </div>
         ))}
       </div>
