@@ -2,12 +2,11 @@
 // Search input component - redirects to search page
 ---
 
-<div class="relative">
+<div class="relative search-wrapper">
   <input
     type="search"
-    id="search-input"
     placeholder="Search..."
-    class="w-full px-4 py-2 pl-10 rounded-lg bg-slate-900 light:bg-white border border-slate-800 light:border-slate-200 text-slate-100 light:text-slate-900 placeholder-slate-500 light:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 light:focus:ring-cyan-600 focus:border-transparent"
+    class="search-input w-full px-4 py-2 pl-10 rounded-lg bg-slate-900 light:bg-white border border-slate-800 light:border-slate-200 text-slate-100 light:text-slate-900 placeholder-slate-500 light:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 light:focus:ring-cyan-600 focus:border-transparent"
     data-pagefind-ignore
   />
   <svg
@@ -28,18 +27,20 @@
 <script is:inline>
   (function() {
     function initSearch() {
-      const searchInput = document.getElementById('search-input');
-      if (searchInput && !searchInput.hasAttribute('data-initialized')) {
-        searchInput.setAttribute('data-initialized', 'true');
-        searchInput.addEventListener('keypress', function(e) {
-          if (e.key === 'Enter') {
-            const query = searchInput.value.trim();
-            if (query) {
-              window.location.href = '/search?q=' + encodeURIComponent(query);
+      const searchInputs = document.querySelectorAll('.search-input');
+      searchInputs.forEach((searchInput) => {
+        if (!searchInput.hasAttribute('data-initialized')) {
+          searchInput.setAttribute('data-initialized', 'true');
+          searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+              const query = searchInput.value.trim();
+              if (query) {
+                window.location.href = '/search?q=' + encodeURIComponent(query);
+              }
             }
-          }
-        });
-      }
+          });
+        }
+      });
     }
 
     // Initialize on DOM ready
