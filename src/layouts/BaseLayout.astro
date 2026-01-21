@@ -151,6 +151,22 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
       mobileMenuButton?.addEventListener('click', () => {
         mobileMenu?.classList.toggle('hidden');
+
+        // Initialize any search inputs that become visible
+        setTimeout(() => {
+          const searchInputs = mobileMenu?.querySelectorAll('.search-input:not([data-initialized])');
+          searchInputs?.forEach((searchInput) => {
+            searchInput.setAttribute('data-initialized', 'true');
+            searchInput.addEventListener('keypress', function(e) {
+              if (e.key === 'Enter') {
+                const query = searchInput.value.trim();
+                if (query) {
+                  window.location.href = '/search?q=' + encodeURIComponent(query);
+                }
+              }
+            });
+          });
+        }, 50);
       });
     </script>
   </body>

@@ -24,33 +24,34 @@
   </svg>
 </div>
 
-<script is:inline>
-  (function() {
-    function initSearch() {
-      const searchInputs = document.querySelectorAll('.search-input');
-      searchInputs.forEach((searchInput) => {
-        if (!searchInput.hasAttribute('data-initialized')) {
-          searchInput.setAttribute('data-initialized', 'true');
-          searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-              const query = searchInput.value.trim();
-              if (query) {
-                window.location.href = '/search?q=' + encodeURIComponent(query);
-              }
-            }
-          });
+<script>
+  function initSearchInputs() {
+    const searchInputs = document.querySelectorAll('.search-input:not([data-initialized])');
+    searchInputs.forEach((searchInput) => {
+      searchInput.setAttribute('data-initialized', 'true');
+      searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          const query = searchInput.value.trim();
+          if (query) {
+            window.location.href = '/search?q=' + encodeURIComponent(query);
+          }
         }
       });
-    }
+    });
+  }
 
-    // Initialize on DOM ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initSearch);
-    } else {
-      initSearch();
-    }
+  // Initialize immediately
+  initSearchInputs();
 
-    // Also handle Astro page transitions
-    document.addEventListener('astro:page-load', initSearch);
-  })();
+  // Re-initialize after Astro page transitions
+  document.addEventListener('astro:page-load', () => {
+    // Small delay to ensure DOM is updated
+    setTimeout(initSearchInputs, 50);
+  });
+
+  // Also use MutationObserver for dynamic content
+  const observer = new MutationObserver(() => {
+    initSearchInputs();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 </script>
