@@ -49,12 +49,12 @@ const filteredHeadings = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
 <!-- Modal Panel -->
 <div
   id="toc-modal"
-  class="xl:hidden fixed inset-x-4 bottom-4 top-auto max-h-[70vh] bg-slate-950 light:bg-white border border-slate-800 light:border-slate-200 z-50 rounded-lg shadow-2xl transform scale-95 opacity-0 transition-all duration-150 ease-in-out overflow-hidden"
+  class="xl:hidden fixed inset-x-4 bottom-4 top-auto max-h-[70vh] bg-slate-950 light:bg-white border border-slate-800 light:border-slate-200 z-50 rounded-lg shadow-2xl transform scale-95 opacity-0 transition-all duration-150 ease-in-out flex flex-col"
   role="dialog"
   aria-modal="true"
   aria-label="Table of contents"
 >
-  <div class="sticky top-0 bg-slate-950 light:bg-white border-b border-slate-800 light:border-slate-200 z-10 px-4 py-3 flex items-center justify-between">
+  <div class="sticky top-0 bg-slate-950 light:bg-white border-b border-slate-800 light:border-slate-200 z-10 px-4 py-3 flex items-center justify-between shrink-0">
     <h2 class="text-lg font-semibold text-slate-100 light:text-slate-900">On this page</h2>
     <button
       id="toc-modal-close"
@@ -66,7 +66,7 @@ const filteredHeadings = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
       </svg>
     </button>
   </div>
-  <nav class="p-4 overflow-y-auto max-h-[calc(70vh-4rem)]">
+  <nav class="p-4 overflow-y-auto flex-1">
     <ul class="space-y-2 text-sm">
       {filteredHeadings.map((heading) => (
         <li
