@@ -9,6 +9,7 @@ const { headings, currentHeading } = Astro.props;
 const filteredHeadings = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
 ---
 
+<!-- Desktop Sidebar -->
 <aside class="hidden xl:block w-64 shrink-0 sticky top-20 h-[calc(100vh-5rem)] overflow-y-auto pl-4">
   <nav class="space-y-2">
     <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
@@ -36,3 +37,55 @@ const filteredHeadings = headings.filter((h) => h.depth >= 2 && h.depth <= 3);
     </ul>
   </nav>
 </aside>
+
+<!-- Mobile Modal -->
+<!-- Backdrop -->
+<div
+  id="toc-modal-backdrop"
+  class="xl:hidden fixed inset-0 bg-black/50 light:bg-white/70 z-50 hidden transition-opacity"
+  aria-hidden="true"
+></div>
+
+<!-- Modal Panel -->
+<div
+  id="toc-modal"
+  class="xl:hidden fixed inset-x-4 bottom-4 top-auto max-h-[70vh] bg-slate-950 light:bg-white border border-slate-800 light:border-slate-200 z-50 rounded-lg shadow-2xl transform scale-95 opacity-0 transition-all duration-150 ease-in-out overflow-hidden"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Table of contents"
+>
+  <div class="sticky top-0 bg-slate-950 light:bg-white border-b border-slate-800 light:border-slate-200 z-10 px-4 py-3 flex items-center justify-between">
+    <h2 class="text-lg font-semibold text-slate-100 light:text-slate-900">On this page</h2>
+    <button
+      id="toc-modal-close"
+      class="p-1 rounded-md text-slate-400 light:text-slate-600 hover:text-slate-100 light:hover:text-slate-900 hover:bg-slate-800 light:hover:bg-slate-100 transition-colors"
+      aria-label="Close table of contents"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  </div>
+  <nav class="p-4 overflow-y-auto max-h-[calc(70vh-4rem)]">
+    <ul class="space-y-2 text-sm">
+      {filteredHeadings.map((heading) => (
+        <li
+          class={`transition-colors ${
+            heading.depth === 3 ? 'pl-4' : ''
+          } ${
+            currentHeading === heading.slug
+              ? 'text-cyan-400 light:text-cyan-600'
+              : 'text-slate-400 light:text-slate-600 hover:text-slate-300 light:hover:text-slate-500'
+          }`}
+        >
+          <a
+            href={`#${heading.slug}`}
+            class="block py-1 border-l-2 border-transparent hover:border-slate-700 light:hover:border-slate-300 pl-3 -ml-3"
+          >
+            {heading.text}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+</div>

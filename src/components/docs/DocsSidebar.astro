@@ -20,6 +20,7 @@ for (const category in docsByCategory) {
 }
 ---
 
+<!-- Desktop Sidebar -->
 <aside class="w-64 shrink-0 hidden lg:block sticky top-20 h-[calc(100vh-5rem)] overflow-y-auto pr-4">
   <nav class="space-y-6">
     {
@@ -45,3 +46,56 @@ for (const category in docsByCategory) {
     }
   </nav>
 </aside>
+
+<!-- Mobile Drawer -->
+<!-- Backdrop -->
+<div
+  id="docs-drawer-backdrop"
+  class="lg:hidden fixed inset-0 bg-black/50 light:bg-white/70 z-50 hidden transition-opacity"
+  aria-hidden="true"
+></div>
+
+<!-- Drawer Panel -->
+<div
+  id="docs-drawer"
+  class="lg:hidden fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-slate-950 light:bg-white border-r border-slate-800 light:border-slate-200 z-50 transform -translate-x-full transition-transform duration-300 ease-in-out overflow-y-auto"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Docs navigation"
+>
+  <div class="sticky top-0 bg-slate-950 light:bg-white border-b border-slate-800 light:border-slate-200 z-10 px-4 py-3 flex items-center justify-between">
+    <h2 class="text-lg font-semibold text-slate-100 light:text-slate-900">Docs Menu</h2>
+    <button
+      id="docs-drawer-close"
+      class="p-1 rounded-md text-slate-400 light:text-slate-600 hover:text-slate-100 light:hover:text-slate-900 hover:bg-slate-800 light:hover:bg-slate-100 transition-colors"
+      aria-label="Close docs menu"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  </div>
+  <nav class="p-4 space-y-6">
+    {
+      sortedCategories.map((category) => (
+        <div>
+          <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+            {category}
+          </h3>
+          <ul class="space-y-1">
+            {docsByCategory[category].map((doc) => (
+              <li>
+                <a
+                  href={`/docs/${doc.slug}`}
+                  class="block px-3 py-1.5 rounded-md text-sm transition-colors text-slate-400 light:text-slate-600 hover:bg-slate-900 light:hover:bg-slate-100 hover:text-cyan-400 light:hover:text-cyan-600"
+                >
+                  {doc.data.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))
+    }
+  </nav>
+</div>
