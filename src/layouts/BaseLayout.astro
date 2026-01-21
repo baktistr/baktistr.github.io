@@ -169,5 +169,83 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
         }, 50);
       });
     </script>
+
+    <script>
+      function initCopyButtons() {
+        document.querySelectorAll('pre:not([data-copy-init])').forEach((pre) => {
+          pre.setAttribute('data-copy-init', 'true');
+          pre.style.position = 'relative';
+
+          const button = document.createElement('button');
+          button.className = 'copy-code-btn';
+          button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+          button.title = 'Copy code';
+
+          button.addEventListener('click', async () => {
+            const code = pre.querySelector('code')?.textContent || pre.textContent || '';
+            try {
+              await navigator.clipboard.writeText(code);
+              button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+              button.classList.add('copied');
+              setTimeout(() => {
+                button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+                button.classList.remove('copied');
+              }, 2000);
+            } catch (err) {
+              console.error('Failed to copy:', err);
+            }
+          });
+
+          pre.appendChild(button);
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', initCopyButtons);
+      document.addEventListener('astro:page-load', initCopyButtons);
+    </script>
+
+    <style is:global>
+      .copy-code-btn {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        padding: 0.5rem;
+        border-radius: 0.375rem;
+        background: rgb(30 41 59 / 0.8);
+        border: 1px solid rgb(51 65 85);
+        color: rgb(148 163 184);
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.2s, color 0.2s, background 0.2s;
+      }
+
+      pre:hover .copy-code-btn {
+        opacity: 1;
+      }
+
+      .copy-code-btn:hover {
+        color: rgb(34 211 238);
+        background: rgb(30 41 59);
+      }
+
+      .copy-code-btn.copied {
+        color: rgb(52 211 153);
+      }
+
+      html.light .copy-code-btn {
+        background: rgb(241 245 249 / 0.8);
+        border-color: rgb(226 232 240);
+        color: rgb(100 116 139);
+      }
+
+      html.light .copy-code-btn:hover {
+        color: rgb(8 145 178);
+        background: rgb(241 245 249);
+      }
+
+      html.light .copy-code-btn.copied {
+        color: rgb(16 185 129);
+      }
+    </style>
   </body>
 </html>
