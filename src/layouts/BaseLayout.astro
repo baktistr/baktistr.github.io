@@ -84,7 +84,54 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
             <Search />
           </div>
           <ThemeToggle />
+          <button
+            id="mobile-menu-button"
+            class="md:hidden p-2 text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600"
+            aria-label="Toggle menu"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
         </div>
+      </div>
+      <!-- Mobile Menu -->
+      <div id="mobile-menu" class="hidden md:hidden border-t border-slate-800 light:border-slate-200">
+        <nav class="container mx-auto px-4 py-4 flex flex-col gap-4">
+          <a
+            href="/docs"
+            class="text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+          >
+            Docs
+          </a>
+          <a
+            href="/blog"
+            class="text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+          >
+            Blog
+          </a>
+          <a
+            href="/projects"
+            class="text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+          >
+            Projects
+          </a>
+          <a
+            href="/about"
+            class="text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+          >
+            About
+          </a>
+          <a
+            href="/tags"
+            class="text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+          >
+            Tags
+          </a>
+          <div class="sm:hidden pt-4 border-t border-slate-800 light:border-slate-200">
+            <Search />
+          </div>
+        </nav>
       </div>
     </header>
 
@@ -97,5 +144,14 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
         <p>&copy; {new Date().getFullYear()} Bakti Satria. All rights reserved.</p>
       </div>
     </footer>
+
+    <script>
+      const mobileMenuButton = document.getElementById('mobile-menu-button');
+      const mobileMenu = document.getElementById('mobile-menu');
+
+      mobileMenuButton?.addEventListener('click', () => {
+        mobileMenu?.classList.toggle('hidden');
+      });
+    </script>
   </body>
 </html>
