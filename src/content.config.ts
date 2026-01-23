@@ -6,6 +6,7 @@ const docs = defineCollection({
     title: z.string(),
     description: z.string(),
     category: z.string().default('General'),
+    subcategory: z.string().optional(),
     order: z.number().default(999),
     tags: z.array(z.string()).default([]),
     updated: z.coerce.date().optional(),

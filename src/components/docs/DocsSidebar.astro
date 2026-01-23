@@ -2,45 +2,178 @@
 import { getCollection } from 'astro:content';
 
 const allDocs = await getCollection('docs');
-const docsByCategory = allDocs
-  .filter((doc) => !doc.data.draft)
-  .reduce((acc, doc) => {
-    const category = doc.data.category;
-    if (!acc[category]) {
-      acc[category] = [];
-    }
-    acc[category].push(doc);
-    return acc;
-  }, {} as Record<string, typeof allDocs>);
+const nonDraftDocs = allDocs.filter((doc) => !doc.data.draft);
 
-// Sort categories and docs
-const sortedCategories = Object.keys(docsByCategory).sort();
-for (const category in docsByCategory) {
-  docsByCategory[category].sort((a, b) => a.data.order - b.data.order);
+// Build hierarchical structure: category -> subcategory -> docs
+interface DocItem {
+  title: string;
+  slug: string;
+  order: number;
+}
+
+interface Subcategory {
+  name: string;
+  index?: DocItem;
+  docs: DocItem[];
+}
+
+interface Category {
+  name: string;
+  index?: DocItem;
+  subcategories: Map<string, Subcategory>;
+}
+
+const categories = new Map<string, Category>();
+
+// First pass: organize all docs
+for (const doc of nonDraftDocs) {
+  const { category, subcategory, title, order } = doc.data;
+
+  if (!categories.has(category)) {
+    categories.set(category, {
+      name: category,
+      subcategories: new Map(),
+    });
+  }
+
+  const cat = categories.get(category)!;
+
+  // Check if this is a category index (no subcategory and slug matches category folder)
+  const slugParts = doc.slug.split('/');
+  const isIndex = slugParts[slugParts.length - 1] === 'index';
+
+  if (!subcategory) {
+    // This is either a category index or a direct child of the category
+    if (isIndex && slugParts.length === 1) {
+      // Root index (docs/index.mdx) - skip, handled by /docs page
+      continue;
+    } else if (isIndex) {
+      cat.index = { title, slug: doc.slug, order };
+    } else {
+      // Direct doc under category (no subcategory)
+      if (!cat.subcategories.has('_root')) {
+        cat.subcategories.set('_root', { name: '_root', docs: [] });
+      }
+      cat.subcategories.get('_root')!.docs.push({ title, slug: doc.slug, order });
+    }
+  } else {
+    // Has subcategory
+    if (!cat.subcategories.has(subcategory)) {
+      cat.subcategories.set(subcategory, { name: subcategory, docs: [] });
+    }
+
+    const subcat = cat.subcategories.get(subcategory)!;
+
+    if (isIndex) {
+      subcat.index = { title, slug: doc.slug, order };
+    } else {
+      subcat.docs.push({ title, slug: doc.slug, order });
+    }
+  }
+}
+
+// Sort categories (General first, then alphabetically)
+const sortedCategories = [...categories.entries()].sort(([a], [b]) => {
+  if (a === 'General') return -1;
+  if (b === 'General') return 1;
+  return a.localeCompare(b);
+});
+
+// Sort subcategories and docs within each category
+for (const [, cat] of sortedCategories) {
+  for (const [, subcat] of cat.subcategories) {
+    subcat.docs.sort((a, b) => a.order - b.order);
+  }
 }
 ---
 
 <!-- Desktop Sidebar -->
 <aside class="w-64 shrink-0 hidden lg:block sticky top-20 h-[calc(100vh-5rem)] overflow-y-auto pr-4">
-  <nav class="space-y-6">
+  <nav class="space-y-4">
     {
-      sortedCategories.map((category) => (
-        <div>
-          <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-            {category}
-          </h3>
-          <ul class="space-y-1">
-            {docsByCategory[category].map((doc) => (
-              <li>
-                <a
-                  href={`/docs/${doc.slug}`}
-                  class="block px-3 py-1.5 rounded-md text-sm transition-colors text-slate-400 light:text-slate-600 hover:bg-slate-900 light:hover:bg-slate-100 hover:text-cyan-400 light:hover:text-cyan-600"
-                >
-                  {doc.data.title}
-                </a>
-              </li>
-            ))}
-          </ul>
+      sortedCategories.map(([categoryKey, category]) => (
+        <div class="space-y-1">
+          {/* Category header - clickable if has index */}
+          {category.index ? (
+            <a
+              href={`/docs/${category.index.slug}`}
+              class="flex items-center gap-1 text-sm font-semibold text-slate-200 light:text-slate-800 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors py-1"
+            >
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              {category.name}
+            </a>
+          ) : (
+            <span class="flex items-center gap-1 text-sm font-semibold text-slate-200 light:text-slate-800 py-1">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              {category.name}
+            </span>
+          )}
+
+          {/* Subcategories */}
+          <div class="ml-3 border-l border-slate-800 light:border-slate-200 pl-3 space-y-2">
+            {[...category.subcategories.entries()]
+              .filter(([key]) => key !== '_root')
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([subcatKey, subcategory]) => (
+                <div class="space-y-1">
+                  {/* Subcategory header - clickable if has index */}
+                  {subcategory.index ? (
+                    <a
+                      href={`/docs/${subcategory.index.slug}`}
+                      class="flex items-center gap-1 text-sm font-medium text-slate-300 light:text-slate-700 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+                    >
+                      <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                      {subcategory.name}
+                    </a>
+                  ) : (
+                    <span class="flex items-center gap-1 text-sm font-medium text-slate-300 light:text-slate-700">
+                      <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                      {subcategory.name}
+                    </span>
+                  )}
+
+                  {/* Docs under this subcategory */}
+                  {subcategory.docs.length > 0 && (
+                    <ul class="ml-4 space-y-0.5">
+                      {subcategory.docs.map((doc) => (
+                        <li>
+                          <a
+                            href={`/docs/${doc.slug}`}
+                            class="block px-2 py-1 rounded text-sm text-slate-400 light:text-slate-600 hover:bg-slate-900 light:hover:bg-slate-100 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+                          >
+                            {doc.title}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+
+            {/* Direct docs under category (no subcategory) */}
+            {category.subcategories.has('_root') && (
+              <ul class="space-y-0.5">
+                {category.subcategories.get('_root')!.docs.map((doc) => (
+                  <li>
+                    <a
+                      href={`/docs/${doc.slug}`}
+                      class="block px-2 py-1 rounded text-sm text-slate-400 light:text-slate-600 hover:bg-slate-900 light:hover:bg-slate-100 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+                    >
+                      {doc.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       ))
     }
@@ -75,25 +208,91 @@ for (const category in docsByCategory) {
       </svg>
     </button>
   </div>
-  <nav class="p-4 space-y-6 overflow-y-auto flex-1">
+  <nav class="p-4 space-y-4 overflow-y-auto flex-1">
     {
-      sortedCategories.map((category) => (
-        <div>
-          <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-            {category}
-          </h3>
-          <ul class="space-y-1">
-            {docsByCategory[category].map((doc) => (
-              <li>
-                <a
-                  href={`/docs/${doc.slug}`}
-                  class="block px-3 py-1.5 rounded-md text-sm transition-colors text-slate-400 light:text-slate-600 hover:bg-slate-900 light:hover:bg-slate-100 hover:text-cyan-400 light:hover:text-cyan-600"
-                >
-                  {doc.data.title}
-                </a>
-              </li>
-            ))}
-          </ul>
+      sortedCategories.map(([categoryKey, category]) => (
+        <div class="space-y-1">
+          {/* Category header - clickable if has index */}
+          {category.index ? (
+            <a
+              href={`/docs/${category.index.slug}`}
+              class="flex items-center gap-1 text-sm font-semibold text-slate-200 light:text-slate-800 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors py-1"
+            >
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              {category.name}
+            </a>
+          ) : (
+            <span class="flex items-center gap-1 text-sm font-semibold text-slate-200 light:text-slate-800 py-1">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              {category.name}
+            </span>
+          )}
+
+          {/* Subcategories */}
+          <div class="ml-3 border-l border-slate-800 light:border-slate-200 pl-3 space-y-2">
+            {[...category.subcategories.entries()]
+              .filter(([key]) => key !== '_root')
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([subcatKey, subcategory]) => (
+                <div class="space-y-1">
+                  {/* Subcategory header - clickable if has index */}
+                  {subcategory.index ? (
+                    <a
+                      href={`/docs/${subcategory.index.slug}`}
+                      class="flex items-center gap-1 text-sm font-medium text-slate-300 light:text-slate-700 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+                    >
+                      <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                      {subcategory.name}
+                    </a>
+                  ) : (
+                    <span class="flex items-center gap-1 text-sm font-medium text-slate-300 light:text-slate-700">
+                      <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                      {subcategory.name}
+                    </span>
+                  )}
+
+                  {/* Docs under this subcategory */}
+                  {subcategory.docs.length > 0 && (
+                    <ul class="ml-4 space-y-0.5">
+                      {subcategory.docs.map((doc) => (
+                        <li>
+                          <a
+                            href={`/docs/${doc.slug}`}
+                            class="block px-2 py-1 rounded text-sm text-slate-400 light:text-slate-600 hover:bg-slate-900 light:hover:bg-slate-100 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+                          >
+                            {doc.title}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+
+            {/* Direct docs under category (no subcategory) */}
+            {category.subcategories.has('_root') && (
+              <ul class="space-y-0.5">
+                {category.subcategories.get('_root')!.docs.map((doc) => (
+                  <li>
+                    <a
+                      href={`/docs/${doc.slug}`}
+                      class="block px-2 py-1 rounded text-sm text-slate-400 light:text-slate-600 hover:bg-slate-900 light:hover:bg-slate-100 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+                    >
+                      {doc.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       ))
     }

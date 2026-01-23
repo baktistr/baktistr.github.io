@@ -1,0 +1,39 @@
+---
+title: Membership Inference Attack
+description: Understanding membership inference attacks on ML models
+category: Others
+subcategory: Privacy
+order: 3
+tags: ["privacy", "ml", "security", "attack"]
+---
+
+# Membership Inference Attack
+
+Understanding membership inference attacks - a privacy attack that determines whether a specific data point was used in training a machine learning model.
+
+## What is a Membership Inference Attack?
+
+A membership inference attack (MIA) is a privacy attack where an adversary attempts to determine whether a particular data record was part of the training dataset used to build a machine learning model.
+
+## How It Works
+
+1. **Shadow Model Training** - Train multiple models on similar data distributions
+2. **Attack Model Training** - Train a classifier to distinguish member vs non-member behavior
+3. **Inference** - Use the attack model to classify target records
+
+## Why It Matters
+
+- Privacy regulations (GDPR, HIPAA)
+- Sensitive data exposure
+- Model vulnerability assessment
+
+## Defenses
+
+- Differential privacy training
+- Regularization techniques
+- Output perturbation
+- Membership inference game training
+
+## Further Reading
+
+Coming soon.
