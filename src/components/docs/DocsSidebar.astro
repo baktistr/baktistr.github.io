@@ -66,10 +66,10 @@ for (const doc of nonDraftDocs) {
   }
 }
 
-// Sort categories (Documentation first, then alphabetically)
+// Sort categories (Home first, then alphabetically)
 const sortedCategories = [...categories.entries()].sort(([a], [b]) => {
-  if (a === 'Documentation') return -1;
-  if (b === 'Documentation') return 1;
+  if (a === 'Home') return -1;
+  if (b === 'Home') return 1;
   return a.localeCompare(b);
 });
 
