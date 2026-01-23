@@ -4,6 +4,9 @@ import { getCollection } from 'astro:content';
 const allDocs = await getCollection('docs');
 const nonDraftDocs = allDocs.filter((doc) => !doc.data.draft);
 
+// Get current page path
+const currentPath = Astro.url.pathname.replace(/\/$/, '');
+
 // Build hierarchical structure: category -> subcategory -> docs
 interface DocItem {
   title: string;
@@ -37,12 +40,10 @@ for (const doc of nonDraftDocs) {
   }
 
   const cat = categories.get(category)!;
-  // Use doc.id (actual file path) to detect index files since Astro strips "index" from slugs
   const isIndex = doc.id.endsWith('index.mdx') || doc.id.endsWith('index.md');
 
   if (!subcategory) {
     if (isIndex && doc.id === 'index.mdx') {
-      // Root index (docs/index.mdx) - skip
       continue;
     } else if (isIndex) {
       cat.index = { title, slug: doc.slug, order };
@@ -78,6 +79,12 @@ for (const [, cat] of sortedCategories) {
     subcat.docs.sort((a, b) => a.order - b.order);
   }
 }
+
+// Helper to check if a subcategory contains the current page
+function isSubcategoryActive(subcat: Subcategory): boolean {
+  if (subcat.index && currentPath === `/docs/${subcat.index.slug}`) return true;
+  return subcat.docs.some((doc) => currentPath === `/docs/${doc.slug}`);
+}
 ---
 
 <!-- Desktop Sidebar -->
@@ -86,7 +93,6 @@ for (const [, cat] of sortedCategories) {
     {
       sortedCategories.map(([categoryKey, category]) => (
         <div class="space-y-1">
-          {/* Category header */}
           {category.index ? (
             <a
               href={`/docs/${category.index.slug}`}
@@ -106,66 +112,76 @@ for (const [, cat] of sortedCategories) {
             </span>
           )}
 
-          {/* Subcategories */}
           <div class="ml-5 space-y-1">
             {[...category.subcategories.entries()]
               .filter(([key]) => key !== '_root')
               .sort(([a], [b]) => a.localeCompare(b))
-              .map(([subcatKey, subcategory]) => (
-                <div class="docs-subcategory" data-subcategory={subcatKey}>
-                  {/* Expandable subcategory header */}
-                  <div class="flex items-center">
-                    {subcategory.docs.length > 0 && (
+              .map(([subcatKey, subcategory]) => {
+                const isActive = isSubcategoryActive(subcategory);
+                const hasChildren = subcategory.docs.length > 0;
+                return (
+                  <div class="docs-subcategory" data-subcategory={subcatKey} data-active={isActive}>
+                    <div class="flex items-center">
                       <button
                         type="button"
                         class="docs-expand-btn p-0.5 -ml-1 mr-0.5 text-slate-500 hover:text-slate-300 light:hover:text-slate-700 transition-colors"
                         aria-label={`Expand ${subcategory.name}`}
                       >
-                        <svg class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class={`w-3 h-3 transition-transform ${isActive && hasChildren ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                         </svg>
                       </button>
-                    )}
-                    {subcategory.index ? (
-                      <a
-                        href={`/docs/${subcategory.index.slug}`}
-                        class="flex-1 text-sm text-slate-300 light:text-slate-700 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors py-0.5"
-                      >
-                        {subcategory.name}
-                      </a>
-                    ) : (
-                      <span class="flex-1 text-sm text-slate-300 light:text-slate-700 py-0.5">
-                        {subcategory.name}
-                      </span>
+                      {subcategory.index ? (
+                        <a
+                          href={`/docs/${subcategory.index.slug}`}
+                          class={`flex-1 text-sm transition-colors py-0.5 ${
+                            currentPath === `/docs/${subcategory.index.slug}`
+                              ? 'text-cyan-400 light:text-cyan-600'
+                              : 'text-slate-300 light:text-slate-700 hover:text-cyan-400 light:hover:text-cyan-600'
+                          }`}
+                        >
+                          {subcategory.name}
+                        </a>
+                      ) : (
+                        <span class="flex-1 text-sm text-slate-300 light:text-slate-700 py-0.5">
+                          {subcategory.name}
+                        </span>
+                      )}
+                    </div>
+
+                    {hasChildren && (
+                      <ul class={`docs-children ml-3 mt-1 space-y-0.5 border-l border-slate-800 light:border-slate-200 pl-3 ${isActive ? '' : 'hidden'}`}>
+                        {subcategory.docs.map((doc) => (
+                          <li>
+                            <a
+                              href={`/docs/${doc.slug}`}
+                              class={`block text-sm transition-colors py-0.5 ${
+                                currentPath === `/docs/${doc.slug}`
+                                  ? 'text-cyan-400 light:text-cyan-600'
+                                  : 'text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600'
+                              }`}
+                            >
+                              {doc.title}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
+                );
+              })}
 
-                  {/* Child docs - hidden by default, shown on expand */}
-                  {subcategory.docs.length > 0 && (
-                    <ul class="docs-children hidden ml-3 mt-1 space-y-0.5 border-l border-slate-800 light:border-slate-200 pl-3">
-                      {subcategory.docs.map((doc) => (
-                        <li>
-                          <a
-                            href={`/docs/${doc.slug}`}
-                            class="block text-sm text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors py-0.5"
-                          >
-                            {doc.title}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
-
-            {/* Direct docs under category (no subcategory) */}
             {category.subcategories.has('_root') && (
               <ul class="space-y-0.5">
                 {category.subcategories.get('_root')!.docs.map((doc) => (
                   <li>
                     <a
                       href={`/docs/${doc.slug}`}
-                      class="block text-sm text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors py-0.5"
+                      class={`block text-sm transition-colors py-0.5 ${
+                        currentPath === `/docs/${doc.slug}`
+                          ? 'text-cyan-400 light:text-cyan-600'
+                          : 'text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600'
+                      }`}
                     >
                       {doc.title}
                     </a>
@@ -233,50 +249,60 @@ for (const [, cat] of sortedCategories) {
             {[...category.subcategories.entries()]
               .filter(([key]) => key !== '_root')
               .sort(([a], [b]) => a.localeCompare(b))
-              .map(([subcatKey, subcategory]) => (
-                <div class="docs-subcategory" data-subcategory={subcatKey}>
-                  <div class="flex items-center">
-                    {subcategory.docs.length > 0 && (
+              .map(([subcatKey, subcategory]) => {
+                const isActive = isSubcategoryActive(subcategory);
+                const hasChildren = subcategory.docs.length > 0;
+                return (
+                  <div class="docs-subcategory" data-subcategory={subcatKey} data-active={isActive}>
+                    <div class="flex items-center">
                       <button
                         type="button"
                         class="docs-expand-btn p-0.5 -ml-1 mr-0.5 text-slate-500 hover:text-slate-300 light:hover:text-slate-700 transition-colors"
                         aria-label={`Expand ${subcategory.name}`}
                       >
-                        <svg class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class={`w-3 h-3 transition-transform ${isActive && hasChildren ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                         </svg>
                       </button>
-                    )}
-                    {subcategory.index ? (
-                      <a
-                        href={`/docs/${subcategory.index.slug}`}
-                        class="flex-1 text-sm text-slate-300 light:text-slate-700 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors py-0.5"
-                      >
-                        {subcategory.name}
-                      </a>
-                    ) : (
-                      <span class="flex-1 text-sm text-slate-300 light:text-slate-700 py-0.5">
-                        {subcategory.name}
-                      </span>
+                      {subcategory.index ? (
+                        <a
+                          href={`/docs/${subcategory.index.slug}`}
+                          class={`flex-1 text-sm transition-colors py-0.5 ${
+                            currentPath === `/docs/${subcategory.index.slug}`
+                              ? 'text-cyan-400 light:text-cyan-600'
+                              : 'text-slate-300 light:text-slate-700 hover:text-cyan-400 light:hover:text-cyan-600'
+                          }`}
+                        >
+                          {subcategory.name}
+                        </a>
+                      ) : (
+                        <span class="flex-1 text-sm text-slate-300 light:text-slate-700 py-0.5">
+                          {subcategory.name}
+                        </span>
+                      )}
+                    </div>
+
+                    {hasChildren && (
+                      <ul class={`docs-children ml-3 mt-1 space-y-0.5 border-l border-slate-800 light:border-slate-200 pl-3 ${isActive ? '' : 'hidden'}`}>
+                        {subcategory.docs.map((doc) => (
+                          <li>
+                            <a
+                              href={`/docs/${doc.slug}`}
+                              class={`block text-sm transition-colors py-0.5 ${
+                                currentPath === `/docs/${doc.slug}`
+                                  ? 'text-cyan-400 light:text-cyan-600'
+                                  : 'text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600'
+                              }`}
+                            >
+                              {doc.title}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
-
-                  {subcategory.docs.length > 0 && (
-                    <ul class="docs-children hidden ml-3 mt-1 space-y-0.5 border-l border-slate-800 light:border-slate-200 pl-3">
-                      {subcategory.docs.map((doc) => (
-                        <li>
-                          <a
-                            href={`/docs/${doc.slug}`}
-                            class="block text-sm text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors py-0.5"
-                          >
-                            {doc.title}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
+                );
+              })}
 
             {category.subcategories.has('_root') && (
               <ul class="space-y-0.5">
@@ -284,7 +310,11 @@ for (const [, cat] of sortedCategories) {
                   <li>
                     <a
                       href={`/docs/${doc.slug}`}
-                      class="block text-sm text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors py-0.5"
+                      class={`block text-sm transition-colors py-0.5 ${
+                        currentPath === `/docs/${doc.slug}`
+                          ? 'text-cyan-400 light:text-cyan-600'
+                          : 'text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600'
+                      }`}
                     >
                       {doc.title}
                     </a>
@@ -313,16 +343,13 @@ for (const [, cat] of sortedCategories) {
         if (children) {
           children.classList.toggle('hidden');
           if (icon) {
-            icon.style.transform = children.classList.contains('hidden') ? '' : 'rotate(90deg)';
+            icon.classList.toggle('rotate-90');
           }
         }
       });
     });
   }
 
-  // Run on initial load
   initExpandButtons();
-
-  // Re-run after Astro navigation
   document.addEventListener('astro:after-swap', initExpandButtons);
 </script>
