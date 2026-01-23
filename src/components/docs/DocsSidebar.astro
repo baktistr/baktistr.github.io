@@ -37,11 +37,11 @@ for (const doc of nonDraftDocs) {
   }
 
   const cat = categories.get(category)!;
-  const slugParts = doc.slug.split('/');
-  const isIndex = slugParts[slugParts.length - 1] === 'index';
+  // Use doc.id (actual file path) to detect index files since Astro strips "index" from slugs
+  const isIndex = doc.id.endsWith('index.mdx') || doc.id.endsWith('index.md');
 
   if (!subcategory) {
-    if (isIndex && slugParts.length === 1) {
+    if (isIndex && doc.id === 'index.mdx') {
       // Root index (docs/index.mdx) - skip
       continue;
     } else if (isIndex) {
