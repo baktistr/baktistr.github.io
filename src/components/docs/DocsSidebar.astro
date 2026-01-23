@@ -43,10 +43,9 @@ for (const doc of nonDraftDocs) {
   const isIndex = doc.id.endsWith('index.mdx') || doc.id.endsWith('index.md');
 
   if (!subcategory) {
-    if (isIndex && doc.id === 'index.mdx') {
-      continue;
-    } else if (isIndex) {
-      cat.index = { title, slug: doc.slug, order };
+    if (isIndex) {
+      // Set as category index (including root index.mdx for Home)
+      cat.index = { title, slug: doc.id === 'index.mdx' ? '' : doc.slug, order };
     } else {
       if (!cat.subcategories.has('_root')) {
         cat.subcategories.set('_root', { name: '_root', docs: [] });
