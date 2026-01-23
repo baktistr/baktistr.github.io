@@ -8,7 +8,11 @@ const recentPosts = (await getCollection('blog'))
   .slice(0, 3);
 
 const recentDocs = (await getCollection('docs'))
-  .filter((doc) => !doc.data.draft)
+  .filter((doc) => {
+    // Only show grandchild docs (not index pages)
+    const isIndex = doc.id.endsWith('index.mdx') || doc.id.endsWith('index.md');
+    return !doc.data.draft && !isIndex;
+  })
   .sort((a, b) => (b.data.updated?.valueOf() ?? 0) - (a.data.updated?.valueOf() ?? 0))
   .slice(0, 3);
 ---
