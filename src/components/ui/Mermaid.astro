@@ -1,0 +1,106 @@
+---
+interface Props {
+  chart: string;
+  class?: string;
+}
+
+const { chart, class: className = '' } = Astro.props;
+const uniqueId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
+---
+
+<div class={`mermaid-container ${className}`} data-mermaid-id={uniqueId}>
+  <pre class="mermaid" id={uniqueId}>{chart}</pre>
+</div>
+
+<script>
+  async function initMermaid() {
+    const containers = document.querySelectorAll('.mermaid-container:not([data-initialized])');
+    if (containers.length === 0) return;
+
+    // Load Mermaid from CDN if not already loaded
+    if (typeof window.mermaid === 'undefined') {
+      await new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Failed to load Mermaid'));
+        document.head.appendChild(script);
+      });
+    }
+
+    const isDark = !document.documentElement.classList.contains('light');
+
+    window.mermaid.initialize({
+      startOnLoad: false,
+      theme: isDark ? 'dark' : 'default',
+      securityLevel: 'loose',
+      fontFamily: 'JetBrains Mono, monospace',
+    });
+
+    containers.forEach(container => {
+      container.setAttribute('data-initialized', 'true');
+    });
+
+    await window.mermaid.run();
+  }
+
+  async function reinitMermaid() {
+    const containers = document.querySelectorAll('.mermaid-container');
+    if (containers.length === 0) return;
+
+    const isDark = !document.documentElement.classList.contains('light');
+
+    window.mermaid.initialize({
+      startOnLoad: false,
+      theme: isDark ? 'dark' : 'default',
+      securityLevel: 'loose',
+      fontFamily: 'JetBrains Mono, monospace',
+    });
+
+    // Re-render all diagrams
+    for (const container of containers) {
+      const pre = container.querySelector('.mermaid');
+      if (pre && pre.getAttribute('data-original')) {
+        pre.innerHTML = pre.getAttribute('data-original') || '';
+        pre.removeAttribute('data-processed');
+      } else if (pre) {
+        pre.setAttribute('data-original', pre.textContent || '');
+      }
+    }
+
+    await window.mermaid.run();
+  }
+
+  // Initialize on page load
+  document.addEventListener('DOMContentLoaded', initMermaid);
+  document.addEventListener('astro:page-load', initMermaid);
+
+  // Re-render on theme change
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.attributeName === 'class' && typeof window.mermaid !== 'undefined') {
+        reinitMermaid();
+      }
+    });
+  });
+
+  observer.observe(document.documentElement, { attributes: true });
+</script>
+
+<style>
+  .mermaid-container {
+    @apply my-4 overflow-x-auto;
+  }
+
+  .mermaid {
+    @apply flex justify-center p-4 rounded-lg bg-slate-900 border border-slate-800;
+  }
+
+  :global(html.light) .mermaid {
+    @apply bg-slate-100 border-slate-200;
+  }
+
+  .mermaid svg {
+    @apply max-w-full h-auto;
+  }
+</style>

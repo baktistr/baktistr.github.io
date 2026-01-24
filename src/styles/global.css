@@ -90,10 +90,27 @@
   }
 
   .prose pre code {
-    @apply p-0 bg-transparent border-0 text-slate-100;
+    @apply p-0 bg-transparent border-0;
   }
-  html.light .prose pre code {
-    @apply text-slate-900;
+
+  /* Shiki dual theme support */
+  .astro-code,
+  .astro-code span {
+    color: var(--shiki-dark) !important;
+    background-color: transparent !important;
+  }
+
+  .astro-code {
+    background-color: var(--shiki-dark-bg) !important;
+  }
+
+  html.light .astro-code,
+  html.light .astro-code span {
+    color: var(--shiki-light) !important;
+  }
+
+  html.light .astro-code {
+    background-color: var(--shiki-light-bg) !important;
   }
 
   .prose blockquote {
