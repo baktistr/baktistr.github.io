@@ -93,26 +93,6 @@
     @apply p-0 bg-transparent border-0;
   }
 
-  /* Shiki dual theme support */
-  .astro-code,
-  .astro-code span {
-    color: var(--shiki-dark) !important;
-    background-color: transparent !important;
-  }
-
-  .astro-code {
-    background-color: var(--shiki-dark-bg) !important;
-  }
-
-  html.light .astro-code,
-  html.light .astro-code span {
-    color: var(--shiki-light) !important;
-  }
-
-  html.light .astro-code {
-    background-color: var(--shiki-light-bg) !important;
-  }
-
   .prose blockquote {
     @apply mb-4 pl-4 border-l-4 border-cyan-400 italic text-slate-400;
   }
@@ -143,4 +123,32 @@
   html.light .prose th {
     @apply bg-slate-200;
   }
+}
+
+/* Shiki dual theme support - outside @layer for proper specificity */
+.astro-code {
+  background-color: var(--shiki-dark-bg) !important;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+
+.astro-code code {
+  background-color: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+.astro-code,
+.astro-code span {
+  color: var(--shiki-dark) !important;
+}
+
+html.light .astro-code {
+  background-color: var(--shiki-light-bg) !important;
+}
+
+html.light .astro-code,
+html.light .astro-code span {
+  color: var(--shiki-light) !important;
 }

@@ -9,10 +9,19 @@ const uniqueId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
 ---
 
 <div class={`mermaid-container ${className}`} data-mermaid-id={uniqueId}>
-  <pre class="mermaid" id={uniqueId}>{chart}</pre>
+  <pre class="mermaid" id={uniqueId} set:text={chart} />
 </div>
 
 <script>
+  declare global {
+    interface Window {
+      mermaid: {
+        initialize: (config: Record<string, unknown>) => void;
+        run: (config?: { nodes?: NodeListOf<Element> | Element[] }) => Promise<void>;
+      };
+    }
+  }
+
   async function initMermaid() {
     const containers = document.querySelectorAll('.mermaid-container:not([data-initialized])');
     if (containers.length === 0) return;
@@ -21,7 +30,7 @@ const uniqueId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
     if (typeof window.mermaid === 'undefined') {
       await new Promise<void>((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
+        script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
         script.onload = () => resolve();
         script.onerror = () => reject(new Error('Failed to load Mermaid'));
         document.head.appendChild(script);
@@ -57,18 +66,25 @@ const uniqueId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
       fontFamily: 'JetBrains Mono, monospace',
     });
 
-    // Re-render all diagrams
+    // Re-render all diagrams - need to restore original content
+    const diagramsToRender: Element[] = [];
     for (const container of containers) {
       const pre = container.querySelector('.mermaid');
-      if (pre && pre.getAttribute('data-original')) {
-        pre.innerHTML = pre.getAttribute('data-original') || '';
-        pre.removeAttribute('data-processed');
-      } else if (pre) {
-        pre.setAttribute('data-original', pre.textContent || '');
+      if (pre) {
+        const original = pre.getAttribute('data-original');
+        if (original) {
+          pre.textContent = original;
+          pre.removeAttribute('data-mermaid-processed');
+          diagramsToRender.push(pre);
+        } else {
+          pre.setAttribute('data-original', pre.textContent || '');
+        }
       }
     }
 
-    await window.mermaid.run();
+    if (diagramsToRender.length > 0) {
+      await window.mermaid.run({ nodes: diagramsToRender });
+    }
   }
 
   // Initialize on page load
@@ -100,7 +116,8 @@ const uniqueId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
     @apply bg-slate-100 border-slate-200;
   }
 
-  .mermaid svg {
-    @apply max-w-full h-auto;
+  .mermaid :global(svg) {
+    max-width: 100%;
+    height: auto;
   }
 </style>
