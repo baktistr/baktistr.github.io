@@ -6,10 +6,12 @@ interface Props {
 
 const { chart, class: className = '' } = Astro.props;
 const uniqueId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
+// Trim whitespace from chart definition
+const trimmedChart = chart.trim();
 ---
 
 <div class={`mermaid-container ${className}`} data-mermaid-id={uniqueId}>
-  <pre class="mermaid" id={uniqueId} set:text={chart} />
+  <pre class="mermaid" id={uniqueId} set:html={trimmedChart} />
 </div>
 
 <script>
@@ -42,19 +44,28 @@ const uniqueId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
     window.mermaid.initialize({
       startOnLoad: false,
       theme: isDark ? 'dark' : 'default',
-      securityLevel: 'loose',
+      securityLevel: 'strict',
       fontFamily: 'JetBrains Mono, monospace',
     });
 
+    // Store original content before rendering
     containers.forEach(container => {
       container.setAttribute('data-initialized', 'true');
+      const pre = container.querySelector('.mermaid');
+      if (pre && !pre.getAttribute('data-original')) {
+        pre.setAttribute('data-original', pre.textContent?.trim() || '');
+      }
     });
 
-    await window.mermaid.run();
+    try {
+      await window.mermaid.run();
+    } catch (e) {
+      console.error('Mermaid rendering error:', e);
+    }
   }
 
   async function reinitMermaid() {
-    const containers = document.querySelectorAll('.mermaid-container');
+    const containers = document.querySelectorAll('.mermaid-container[data-initialized]');
     if (containers.length === 0) return;
 
     const isDark = !document.documentElement.classList.contains('light');
@@ -62,7 +73,7 @@ const uniqueId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
     window.mermaid.initialize({
       startOnLoad: false,
       theme: isDark ? 'dark' : 'default',
-      securityLevel: 'loose',
+      securityLevel: 'strict',
       fontFamily: 'JetBrains Mono, monospace',
     });
 
@@ -76,14 +87,16 @@ const uniqueId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
           pre.textContent = original;
           pre.removeAttribute('data-mermaid-processed');
           diagramsToRender.push(pre);
-        } else {
-          pre.setAttribute('data-original', pre.textContent || '');
         }
       }
     }
 
     if (diagramsToRender.length > 0) {
-      await window.mermaid.run({ nodes: diagramsToRender });
+      try {
+        await window.mermaid.run({ nodes: diagramsToRender });
+      } catch (e) {
+        console.error('Mermaid re-rendering error:', e);
+      }
     }
   }
 
