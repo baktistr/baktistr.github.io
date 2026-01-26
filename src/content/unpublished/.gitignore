@@ -1,0 +1,7 @@
+# Ignore all content files in this folder
+*
+
+# But keep these template files
+!blog-template.md
+!docs-template.mdx
+!.gitignore
