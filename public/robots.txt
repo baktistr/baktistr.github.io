@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://baktistr.github.io/sitemap-index.xml

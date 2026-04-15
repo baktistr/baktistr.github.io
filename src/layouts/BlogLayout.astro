@@ -12,9 +12,32 @@ interface Props {
 }
 
 const { title, description, pubDate, tags, readingTime } = Astro.props;
+
+const articleSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  headline: title,
+  description: description ?? '',
+  datePublished: pubDate.toISOString(),
+  author: {
+    '@type': 'Person',
+    name: 'Bakti Satria Adhityatama',
+    url: 'https://baktistr.github.io/about/',
+  },
+  publisher: {
+    '@type': 'Person',
+    name: 'Bakti Satria Adhityatama',
+  },
+  keywords: tags.join(', '),
+  mainEntityOfPage: {
+    '@type': 'WebPage',
+    '@id': new URL(Astro.url.pathname, Astro.site).toString(),
+  },
+};
 ---
 
-<BaseLayout title={title} description={description}>
+<BaseLayout title={title} description={description} type="article" pubDate={pubDate}>
+  <script type="application/ld+json" set:html={JSON.stringify(articleSchema)} />
   <article class="max-w-3xl mx-auto">
     <header class="mb-8">
       <h1 class="text-3xl md:text-4xl font-bold text-slate-100 light:text-slate-900 mb-4">{title}</h1>

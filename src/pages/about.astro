@@ -60,9 +60,36 @@ const experience = [
     ],
   },
 ];
+
+const personSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: 'Bakti Satria Adhityatama',
+  url: 'https://baktistr.github.io/',
+  image: 'https://baktistr.github.io/me_pixelated.png',
+  jobTitle: 'Senior Cybersecurity Solution Engineer',
+  worksFor: {
+    '@type': 'Organization',
+    name: 'Telkom Indonesia',
+  },
+  alumniOf: education.map((edu) => ({
+    '@type': 'EducationalOrganization',
+    name: edu.school,
+  })),
+  hasCredential: certifications.map((cert) => ({
+    '@type': 'EducationalOccupationalCredential',
+    name: cert.full,
+    url: cert.url,
+  })),
+  sameAs: [
+    'https://github.com/baktistr',
+    'https://linkedin.com/in/baktistr',
+  ],
+};
 ---
 
 <BaseLayout title="About" description="Learn more about my cybersecurity journey and expertise">
+  <script type="application/ld+json" set:html={JSON.stringify(personSchema)} />
   <div class="max-w-4xl mx-auto">
     <header class="mb-12">
       <h1 class="text-3xl md:text-4xl font-bold text-slate-100 light:text-slate-900 mb-4">
