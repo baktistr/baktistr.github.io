@@ -90,7 +90,9 @@ const statusLabels = {
 
       <div class="flex flex-wrap gap-2">
         {project.data.tags.map((tag) => (
-          <Badge>{tag}</Badge>
+          <a href={`/tags/${tag}`} class="hover:opacity-80 transition-opacity">
+            <Badge>#{tag}</Badge>
+          </a>
         ))}
       </div>
     </header>

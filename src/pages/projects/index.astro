@@ -63,7 +63,7 @@ const statusColors = {
             <div class="flex items-center justify-between">
               <div class="flex flex-wrap gap-2">
                 {project.data.tags.slice(0, 3).map((tag) => (
-                  <Badge>{tag}</Badge>
+                  <Badge>#{tag}</Badge>
                 ))}
                 {project.data.tags.length > 3 && (
                   <span class="text-xs text-slate-500 light:text-slate-400">

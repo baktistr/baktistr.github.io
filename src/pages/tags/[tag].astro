@@ -6,20 +6,17 @@ import PostCard from '../../components/blog/PostCard.astro';
 export async function getStaticPaths() {
   const blogPosts = await getCollection('blog');
   const docsPosts = await getCollection('docs');
+  const projectPosts = await getCollection('projects');
 
   const allTags = new Set<string>();
 
-  blogPosts
-    .filter((post) => !post.data.draft)
-    .forEach((post) => {
-      post.data.tags.forEach((tag) => allTags.add(tag));
-    });
-
-  docsPosts
-    .filter((post) => !post.data.draft)
-    .forEach((post) => {
-      post.data.tags.forEach((tag) => allTags.add(tag));
-    });
+  for (const collection of [blogPosts, docsPosts, projectPosts]) {
+    collection
+      .filter((post) => !post.data.draft)
+      .forEach((post) => {
+        post.data.tags.forEach((tag) => allTags.add(tag));
+      });
+  }
 
   return Array.from(allTags).map((tag) => ({
     params: { tag },
@@ -35,6 +32,7 @@ const { tag } = Astro.props;
 
 const blogPosts = await getCollection('blog');
 const docsPosts = await getCollection('docs');
+const projectPosts = await getCollection('projects');
 
 const filteredBlogPosts = blogPosts
   .filter((post) => !post.data.draft && post.data.tags.includes(tag))
@@ -44,8 +42,15 @@ const filteredDocsPosts = docsPosts
   .filter((post) => !post.data.draft && post.data.tags.includes(tag))
   .sort((a, b) => a.data.title.localeCompare(b.data.title));
 
+const filteredProjectPosts = projectPosts
+  .filter((post) => !post.data.draft && post.data.tags.includes(tag))
+  .sort((a, b) => {
+    if (a.data.featured !== b.data.featured) return a.data.featured ? -1 : 1;
+    return a.data.title.localeCompare(b.data.title);
+  });
+
 const coTagCounts = new Map<string, number>();
-for (const post of [...filteredBlogPosts, ...filteredDocsPosts]) {
+for (const post of [...filteredBlogPosts, ...filteredDocsPosts, ...filteredProjectPosts]) {
   for (const t of post.data.tags) {
     if (t === tag) continue;
     coTagCounts.set(t, (coTagCounts.get(t) ?? 0) + 1);
@@ -55,7 +60,7 @@ const coTags = [...coTagCounts.entries()].sort(
   (a, b) => b[1] - a[1] || a[0].localeCompare(b[0])
 );
 
-const totalCount = filteredBlogPosts.length + filteredDocsPosts.length;
+const totalCount = filteredBlogPosts.length + filteredDocsPosts.length + filteredProjectPosts.length;
 ---
 
 <BaseLayout title={`Tag: ${tag}`} description={`All posts tagged with ${tag}`}>
@@ -134,6 +139,36 @@ const totalCount = filteredBlogPosts.length + filteredDocsPosts.length;
                 <h3 class="font-semibold text-slate-100 light:text-slate-900 mb-1">
                   {post.data.title}
                 </h3>
+                <p class="text-sm text-slate-400 light:text-slate-600">
+                  {post.data.description}
+                </p>
+              </a>
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
+
+    {filteredProjectPosts.length > 0 && (
+      <section class="mb-12" data-section="projects">
+        <h2 class="text-xl font-bold text-slate-100 light:text-slate-900 mb-6">Projects</h2>
+        <div class="space-y-4">
+          {filteredProjectPosts.map((post) => (
+            <div class="filterable-item" data-tags={post.data.tags.join(' ')}>
+              <a
+                href={`/projects/${post.slug}`}
+                class="block p-4 rounded-lg bg-slate-900 light:bg-white border border-slate-800 light:border-slate-200 hover:border-cyan-400 light:hover:border-cyan-600 transition-colors"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <h3 class="font-semibold text-slate-100 light:text-slate-900 mb-1">
+                    {post.data.title}
+                  </h3>
+                  {post.data.featured && (
+                    <span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 light:text-amber-600 shrink-0">
+                      Featured
+                    </span>
+                  )}
+                </div>
                 <p class="text-sm text-slate-400 light:text-slate-600">
                   {post.data.description}
                 </p>

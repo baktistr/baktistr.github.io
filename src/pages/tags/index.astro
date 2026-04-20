@@ -2,28 +2,23 @@
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
-// Get all posts from both collections
+// Get all posts from all collections
 const blogPosts = await getCollection('blog');
 const docsPosts = await getCollection('docs');
+const projectPosts = await getCollection('projects');
 
 // Extract all tags and count occurrences
 const tagCounts = new Map<string, number>();
 
-blogPosts
-  .filter((post) => !post.data.draft)
-  .forEach((post) => {
-    post.data.tags.forEach((tag) => {
-      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+for (const collection of [blogPosts, docsPosts, projectPosts]) {
+  collection
+    .filter((post) => !post.data.draft)
+    .forEach((post) => {
+      post.data.tags.forEach((tag) => {
+        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      });
     });
-  });
-
-docsPosts
-  .filter((post) => !post.data.draft)
-  .forEach((post) => {
-    post.data.tags.forEach((tag) => {
-      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
-    });
-  });
+}
 
 // Sort tags alphabetically
 const sortedTags = Array.from(tagCounts.entries()).sort((a, b) =>

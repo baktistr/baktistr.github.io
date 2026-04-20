@@ -258,6 +258,24 @@ const ogImageURL = new URL(image, Astro.site).toString();
 
       document.addEventListener('DOMContentLoaded', initTableWrappers);
       document.addEventListener('astro:page-load', initTableWrappers);
+
+      function initSolvedCheckboxes() {
+        const KEY = 'oscp-solved-';
+        document.querySelectorAll('input[type="checkbox"][data-solved]:not([data-solved-init])').forEach((el) => {
+          el.setAttribute('data-solved-init', 'true');
+          if (el.disabled) return;
+          const slug = el.getAttribute('data-solved');
+          if (!slug) return;
+          if (localStorage.getItem(KEY + slug) === '1') el.checked = true;
+          el.addEventListener('change', () => {
+            if (el.checked) localStorage.setItem(KEY + slug, '1');
+            else localStorage.removeItem(KEY + slug);
+          });
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', initSolvedCheckboxes);
+      document.addEventListener('astro:page-load', initSolvedCheckboxes);
     </script>
 
     <style is:global>
