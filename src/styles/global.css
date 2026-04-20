@@ -105,7 +105,13 @@
   }
 
   .prose table {
-    @apply mb-4 border-collapse block max-w-full overflow-x-auto;
+    @apply border-collapse;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .prose-table-wrap {
+    @apply mb-4 overflow-x-auto max-w-full;
   }
 
   .prose th,

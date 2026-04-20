@@ -15,7 +15,7 @@ interface Props {
 }
 
 const { post } = Astro.props;
-const { Content } = await post.render();
+const { Content, headings } = await post.render();
 const words = post.body?.split(/\s+/).length ?? 0;
 const readingTime = Math.max(1, Math.ceil(words / 200));
 ---
@@ -26,6 +26,7 @@ const readingTime = Math.max(1, Math.ceil(words / 200));
   pubDate={post.data.pubDate}
   tags={post.data.tags}
   readingTime={readingTime}
+  headings={headings}
 >
   <Content />
 </BlogLayout>

@@ -215,7 +215,7 @@ function isSubcategoryActive(subcat: Subcategory): boolean {
 
 <div
   id="docs-drawer"
-  class="lg:hidden fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-slate-950 light:bg-white border-r border-slate-800 light:border-slate-200 z-[60] transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col h-full"
+  class="lg:hidden fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-slate-950 light:bg-white border-r border-slate-800 light:border-slate-200 z-[60] transform -translate-x-full pointer-events-none transition-transform duration-300 ease-in-out flex flex-col h-full"
   role="dialog"
   aria-modal="true"
   aria-label="Docs navigation"
@@ -370,14 +370,14 @@ function isSubcategoryActive(subcat: Subcategory): boolean {
     const closeBtn = document.getElementById('docs-drawer-close');
 
     function open() {
-      drawer?.classList.remove('-translate-x-full');
+      drawer?.classList.remove('-translate-x-full', 'pointer-events-none');
       backdrop?.classList.remove('opacity-0', 'pointer-events-none');
       backdrop?.classList.add('opacity-100', 'pointer-events-auto');
       document.body.style.overflow = 'hidden';
     }
 
     function close() {
-      drawer?.classList.add('-translate-x-full');
+      drawer?.classList.add('-translate-x-full', 'pointer-events-none');
       backdrop?.classList.remove('opacity-100', 'pointer-events-auto');
       backdrop?.classList.add('opacity-0', 'pointer-events-none');
       document.body.style.overflow = '';

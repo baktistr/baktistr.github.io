@@ -2,6 +2,7 @@
 import BaseLayout from './BaseLayout.astro';
 import PostMeta from '../components/blog/PostMeta.astro';
 import Badge from '../components/ui/Badge.astro';
+import TableOfContents from '../components/docs/TableOfContents.astro';
 
 interface Props {
   title: string;
@@ -9,9 +10,10 @@ interface Props {
   pubDate: Date;
   tags: string[];
   readingTime: number;
+  headings?: Array<{ depth: number; slug: string; text: string }>;
 }
 
-const { title, description, pubDate, tags, readingTime } = Astro.props;
+const { title, description, pubDate, tags, readingTime, headings = [] } = Astro.props;
 
 const articleSchema = {
   '@context': 'https://schema.org',
@@ -34,30 +36,94 @@ const articleSchema = {
     '@id': new URL(Astro.url.pathname, Astro.site).toString(),
   },
 };
+
+const hasToc = headings.some((h) => h.depth >= 2 && h.depth <= 3);
 ---
 
 <BaseLayout title={title} description={description} type="article" pubDate={pubDate}>
   <script type="application/ld+json" set:html={JSON.stringify(articleSchema)} />
-  <article class="max-w-3xl mx-auto">
-    <header class="mb-8">
-      <h1 class="text-3xl md:text-4xl font-bold text-slate-100 light:text-slate-900 mb-4">{title}</h1>
-      {description && <p class="text-xl text-slate-400 light:text-slate-600 mb-4">{description}</p>}
-      <PostMeta date={pubDate} readingTime={readingTime} tags={tags} />
-    </header>
-    <div class="prose max-w-none">
-      <slot />
-    </div>
-    <footer class="mt-12 pt-8 border-t border-slate-800 light:border-slate-200">
-      <div class="flex flex-wrap gap-2">
-        <span class="text-sm text-slate-500 mr-2">Tags:</span>
-        {tags.map((tag) => (
-          <a href={`/tags/${tag}`}>
-            <Badge variant="default" size="sm">
-              #{tag}
-            </Badge>
-          </a>
-        ))}
+
+  {hasToc && (
+    <button
+      id="toc-modal-toggle"
+      class="xl:hidden fixed bottom-6 right-4 z-40 p-3 rounded-full bg-cyan-500 hover:bg-cyan-400 text-white shadow-lg hover:shadow-cyan-500/25 transition-all"
+      aria-label="Toggle table of contents"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h10" />
+      </svg>
+    </button>
+  )}
+
+  <div class="flex xl:gap-8">
+    <div class="hidden xl:block w-64 shrink-0" aria-hidden="true"></div>
+    <article class="flex-1 min-w-0 mx-auto max-w-3xl">
+      <header class="mb-8">
+        <h1 class="text-3xl md:text-4xl font-bold text-slate-100 light:text-slate-900 mb-4">{title}</h1>
+        {description && <p class="text-xl text-slate-400 light:text-slate-600 mb-4">{description}</p>}
+        <PostMeta date={pubDate} readingTime={readingTime} tags={tags} />
+      </header>
+      <div class="prose max-w-none">
+        <slot />
       </div>
-    </footer>
-  </article>
+      <footer class="mt-12 pt-8 border-t border-slate-800 light:border-slate-200">
+        <div class="flex flex-wrap gap-2">
+          <span class="text-sm text-slate-500 mr-2">Tags:</span>
+          {tags.map((tag) => (
+            <a href={`/tags/${tag}`}>
+              <Badge variant="default" size="sm">
+                #{tag}
+              </Badge>
+            </a>
+          ))}
+        </div>
+      </footer>
+    </article>
+    {hasToc && <TableOfContents headings={headings} currentHeading="" />}
+  </div>
 </BaseLayout>
+
+<script>
+  function initBlogTocModal() {
+    const toggle = document.getElementById('toc-modal-toggle');
+    const modal = document.getElementById('toc-modal');
+    const backdrop = document.getElementById('toc-modal-backdrop');
+    const closeBtn = document.getElementById('toc-modal-close');
+
+    if (!toggle || !modal) return;
+
+    function open() {
+      modal?.classList.remove('scale-95', 'opacity-0', 'pointer-events-none');
+      modal?.classList.add('scale-100', 'opacity-100');
+      backdrop?.classList.remove('opacity-0', 'pointer-events-none');
+      backdrop?.classList.add('opacity-100', 'pointer-events-auto');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function close() {
+      modal?.classList.add('scale-95', 'opacity-0', 'pointer-events-none');
+      modal?.classList.remove('scale-100', 'opacity-100');
+      setTimeout(() => {
+        backdrop?.classList.remove('opacity-100', 'pointer-events-auto');
+        backdrop?.classList.add('opacity-0', 'pointer-events-none');
+        document.body.style.overflow = '';
+      }, 150);
+    }
+
+    toggle.addEventListener('click', open);
+    closeBtn?.addEventListener('click', close);
+    backdrop?.addEventListener('click', close);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') close();
+    });
+
+    // Close modal when a TOC link is clicked (mobile)
+    modal.querySelectorAll('a[href^="#"]').forEach((link) => {
+      link.addEventListener('click', close);
+    });
+  }
+
+  initBlogTocModal();
+  document.addEventListener('astro:after-swap', initBlogTocModal);
+</script>

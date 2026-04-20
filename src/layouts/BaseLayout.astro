@@ -78,7 +78,7 @@ const ogImageURL = new URL(image, Astro.site).toString();
 
     <title>{title}</title>
   </head>
-  <body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 light:bg-slate-50 light:text-slate-900 overflow-x-clip">
+  <body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 light:bg-slate-50 light:text-slate-900 xl:overflow-x-clip">
     <header class="sticky top-0 z-50 w-full border-b border-slate-800 light:border-slate-200 bg-slate-950/80 light:bg-white/80 backdrop-blur">
       <div class="container mx-auto px-4 h-16 flex items-center justify-between">
         <div class="flex items-center gap-8 xl:-ml-8 2xl:-ml-24">
@@ -244,6 +244,19 @@ const ogImageURL = new URL(image, Astro.site).toString();
 
       document.addEventListener('DOMContentLoaded', initCopyButtons);
       document.addEventListener('astro:page-load', initCopyButtons);
+
+      function initTableWrappers() {
+        document.querySelectorAll('.prose table:not([data-wrapped])').forEach((table) => {
+          table.setAttribute('data-wrapped', 'true');
+          const wrapper = document.createElement('div');
+          wrapper.className = 'prose-table-wrap';
+          table.parentNode?.insertBefore(wrapper, table);
+          wrapper.appendChild(table);
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', initTableWrappers);
+      document.addEventListener('astro:page-load', initTableWrappers);
     </script>
 
     <style is:global>

@@ -6,18 +6,24 @@ interface Props {
 const { segments } = Astro.props;
 ---
 
-<nav class="flex items-center gap-2 text-sm text-slate-500 light:text-slate-500 mb-6">
-  <a href="/" class="hover:text-cyan-400 light:hover:text-cyan-600 transition-colors">Home</a>
-  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<nav class="flex items-center gap-1 sm:gap-2 text-sm text-slate-500 light:text-slate-500 mb-6">
+  <a href="/" class="truncate max-w-[4ch] sm:max-w-none hover:text-cyan-400 light:hover:text-cyan-600 transition-colors">Home</a>
+  <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
   </svg>
-  <a href="/docs" class="hover:text-cyan-400 light:hover:text-cyan-600 transition-colors">Docs</a>
-  {segments.map((segment) => (
+  <a href="/docs" class="truncate max-w-[4ch] sm:max-w-none hover:text-cyan-400 light:hover:text-cyan-600 transition-colors">Docs</a>
+  {segments.map((segment, idx) => (
     <>
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
       </svg>
-      <a href={segment.href} class="hover:text-cyan-400 light:hover:text-cyan-600 transition-colors">{segment.name}</a>
+      <a
+        href={segment.href}
+        class:list={[
+          'truncate sm:max-w-none hover:text-cyan-400 light:hover:text-cyan-600 transition-colors',
+          idx === segments.length - 1 ? 'max-w-[10ch]' : 'max-w-[4ch]',
+        ]}
+      >{segment.name}</a>
     </>
   ))}
 </nav>
