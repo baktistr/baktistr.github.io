@@ -86,6 +86,17 @@ function isSubcategoryActive(subcat: Subcategory): boolean {
 }
 ---
 
+<!-- Mobile Docs Menu Toggle Button -->
+<button
+  id="docs-drawer-toggle"
+  class="lg:hidden fixed top-20 left-4 z-40 p-2 rounded-lg bg-slate-900 light:bg-white border border-slate-800 light:border-slate-200 text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 hover:border-cyan-400/50 light:hover:border-cyan-600/50 transition-all shadow-lg"
+  aria-label="Toggle docs menu"
+>
+  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+  </svg>
+</button>
+
 <!-- Desktop Sidebar -->
 <aside class="w-64 shrink-0 hidden lg:block sticky top-20 h-[calc(100vh-5rem)] overflow-y-auto pr-4 sidebar-scroll">
   <nav class="space-y-4">
@@ -156,7 +167,7 @@ function isSubcategoryActive(subcat: Subcategory): boolean {
                               href={`/docs/${doc.slug}`}
                               class={`block text-sm transition-colors py-0.5 ${
                                 currentPath === `/docs/${doc.slug}`
-                                  ? 'text-cyan-400 light:text-cyan-600'
+                                  ? 'relative text-cyan-400 light:text-cyan-600 before:content-[""] before:absolute before:left-[-13px] before:top-0 before:bottom-0 before:w-px before:bg-cyan-400 light:before:bg-cyan-600'
                                   : 'text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600'
                               }`}
                             >
@@ -289,7 +300,7 @@ function isSubcategoryActive(subcat: Subcategory): boolean {
                               href={`/docs/${doc.slug}`}
                               class={`block text-sm transition-colors py-0.5 ${
                                 currentPath === `/docs/${doc.slug}`
-                                  ? 'text-cyan-400 light:text-cyan-600'
+                                  ? 'relative text-cyan-400 light:text-cyan-600 before:content-[""] before:absolute before:left-[-13px] before:top-0 before:bottom-0 before:w-px before:bg-cyan-400 light:before:bg-cyan-600'
                                   : 'text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600'
                               }`}
                             >
@@ -351,4 +362,36 @@ function isSubcategoryActive(subcat: Subcategory): boolean {
 
   initExpandButtons();
   document.addEventListener('astro:after-swap', initExpandButtons);
+
+  function initDocsDrawer() {
+    const toggle = document.getElementById('docs-drawer-toggle');
+    const drawer = document.getElementById('docs-drawer');
+    const backdrop = document.getElementById('docs-drawer-backdrop');
+    const closeBtn = document.getElementById('docs-drawer-close');
+
+    function open() {
+      drawer?.classList.remove('-translate-x-full');
+      backdrop?.classList.remove('opacity-0', 'pointer-events-none');
+      backdrop?.classList.add('opacity-100', 'pointer-events-auto');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function close() {
+      drawer?.classList.add('-translate-x-full');
+      backdrop?.classList.remove('opacity-100', 'pointer-events-auto');
+      backdrop?.classList.add('opacity-0', 'pointer-events-none');
+      document.body.style.overflow = '';
+    }
+
+    toggle?.addEventListener('click', open);
+    closeBtn?.addEventListener('click', close);
+    backdrop?.addEventListener('click', close);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') close();
+    });
+  }
+
+  initDocsDrawer();
+  document.addEventListener('astro:after-swap', initDocsDrawer);
 </script>

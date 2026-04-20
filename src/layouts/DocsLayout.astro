@@ -27,17 +27,6 @@ const {
 ---
 
 <BaseLayout title={`${title} | Docs`} description={description}>
-  <!-- Mobile Docs Menu Toggle Button -->
-  <button
-    id="docs-drawer-toggle"
-    class="lg:hidden fixed top-20 left-4 p-2 rounded-lg bg-slate-900 light:bg-white border border-slate-800 light:border-slate-200 text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 hover:border-cyan-400/50 light:hover:border-cyan-600/50 transition-all shadow-lg"
-    aria-label="Toggle docs menu"
-  >
-    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  </button>
-
   <!-- Mobile TOC Toggle Button -->
   <button
     id="toc-modal-toggle"
@@ -49,8 +38,10 @@ const {
     </svg>
   </button>
 
-  <div class="flex gap-12">
-    <DocsSidebar />
+  <div class="flex gap-16 xl:gap-24">
+    <div class="xl:-ml-8 2xl:-ml-24">
+      <DocsSidebar />
+    </div>
     <div class="flex-1 min-w-0 max-w-4xl">
       <Breadcrumb segments={breadcrumbs} />
       <article class="prose prose-slate">
@@ -63,30 +54,6 @@ const {
 </BaseLayout>
 
 <script>
-  // Docs Drawer functionality
-  const docsDrawerToggle = document.getElementById('docs-drawer-toggle');
-  const docsDrawer = document.getElementById('docs-drawer');
-  const docsDrawerBackdrop = document.getElementById('docs-drawer-backdrop');
-  const docsDrawerClose = document.getElementById('docs-drawer-close');
-
-  function openDocsDrawer() {
-    docsDrawer?.classList.remove('-translate-x-full');
-    docsDrawerBackdrop?.classList.remove('opacity-0', 'pointer-events-none');
-    docsDrawerBackdrop?.classList.add('opacity-100', 'pointer-events-auto');
-    document.body.style.overflow = 'hidden';
-  }
-
-  function closeDocsDrawer() {
-    docsDrawer?.classList.add('-translate-x-full');
-    docsDrawerBackdrop?.classList.remove('opacity-100', 'pointer-events-auto');
-    docsDrawerBackdrop?.classList.add('opacity-0', 'pointer-events-none');
-    document.body.style.overflow = '';
-  }
-
-  docsDrawerToggle?.addEventListener('click', openDocsDrawer);
-  docsDrawerClose?.addEventListener('click', closeDocsDrawer);
-  docsDrawerBackdrop?.addEventListener('click', closeDocsDrawer);
-
   // TOC Modal functionality
   const tocModalToggle = document.getElementById('toc-modal-toggle');
   const tocModal = document.getElementById('toc-modal');
@@ -115,11 +82,8 @@ const {
   tocModalClose?.addEventListener('click', closeTocModal);
   tocModalBackdrop?.addEventListener('click', closeTocModal);
 
-  // Close drawers/modals on escape key
+  // Close TOC modal on escape key
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeDocsDrawer();
-      closeTocModal();
-    }
+    if (e.key === 'Escape') closeTocModal();
   });
 </script>

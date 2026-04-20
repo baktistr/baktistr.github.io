@@ -1,6 +1,7 @@
 ---
 import { getCollection, type CollectionEntry } from 'astro:content';
 import DocsLayout from '../../layouts/DocsLayout.astro';
+import Badge from '../../components/ui/Badge.astro';
 
 export async function getStaticPaths() {
   const docs = await getCollection('docs');
@@ -49,5 +50,14 @@ const next = currentIndex < sortedDocs.length - 1 ? sortedDocs[currentIndex + 1]
   prev={prev ? { title: prev.data.title, slug: prev.slug } : undefined}
   next={next ? { title: next.data.title, slug: next.slug } : undefined}
 >
+  {doc.data.tags.length > 0 && (
+    <div class="not-prose flex flex-wrap gap-2 mb-6">
+      {doc.data.tags.map((tag) => (
+        <a href={`/tags/${tag}`} class="hover:opacity-80 transition-opacity">
+          <Badge variant="default" size="sm">#{tag}</Badge>
+        </a>
+      ))}
+    </div>
+  )}
   <Content />
 </DocsLayout>
