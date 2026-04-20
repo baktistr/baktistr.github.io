@@ -1,6 +1,7 @@
 ---
 title: "Password Strength Demo"
 description: "An interactive web application that analyzes password strength in real-time, demonstrating common password vulnerabilities and best practices for secure authentication."
+url: "https://password-strength-demo.vercel.app/"
 github: "https://github.com/baktistr/password-strength-demo"
 tags: ["security", "passwords", "web", "authentication", "demo"]
 featured: true
