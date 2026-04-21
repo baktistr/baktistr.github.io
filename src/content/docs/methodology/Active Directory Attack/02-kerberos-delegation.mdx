@@ -164,6 +164,8 @@ Unlike classic constrained delegation (configured on the front-end service), RBC
 1. Write access to the target computer's `msDS-AllowedToActOnBehalfOfOtherIdentity`
 2. Control of a computer account (create one or use an existing compromise)
 
+> 💡 **If `MachineAccountQuota = 0`** and you don't already control a computer account, RBCD is blocked. Use [**Shadow Credentials**](/docs/methodology/active-directory-attack/01-permission-delegation#attack-genericall) instead — it abuses the same GenericAll/GenericWrite right via `msDS-KeyCredentialLink` and only needs ADCS in the forest.
+
 ### Step 1: Create a Machine Account
 
 By default, any domain user can create up to 10 machine accounts (`MachineAccountQuota`):
