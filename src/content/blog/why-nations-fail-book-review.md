@@ -2,6 +2,7 @@
 title: "Why Nations Fail: The Origins of Power, Prosperity, and Poverty"
 description: "Book review - Why Nations Fail karya Daron Acemoglu dan James Robinson"
 pubDate: 2019-12-26
+category: Books
 tags: ["personal", "books", "review"]
 ---
 

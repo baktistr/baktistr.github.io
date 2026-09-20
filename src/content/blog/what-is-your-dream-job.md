@@ -2,6 +2,7 @@
 title: "What is Your Dream Job?"
 description: "Refleksi tentang pekerjaan impian dan apa yang membuat pekerjaan benar-benar memuaskan"
 pubDate: 2018-11-02
+category: Career
 tags: ["personal", "career", "reflection"]
 ---
 

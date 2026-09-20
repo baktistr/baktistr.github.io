@@ -2,6 +2,7 @@
 title: "November 2019 Resolutions"
 description: "Setting monthly goals and building daily habits through small wins"
 pubDate: 2019-11-01
+category: Personal
 tags: ["personal", "goals", "productivity"]
 ---
 

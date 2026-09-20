@@ -1,0 +1,118 @@
+---
+interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface TocNode extends Heading {
+  children: TocNode[];
+}
+
+interface Props {
+  headings: Heading[];
+  currentHeading: string;
+  idPrefix: string;
+}
+
+const { headings, currentHeading, idPrefix } = Astro.props;
+const visibleHeadings = headings.filter((heading) => heading.depth >= 1 && heading.depth <= 3);
+const rootDepth = visibleHeadings.length > 0
+  ? Math.min(...visibleHeadings.map((heading) => heading.depth))
+  : 1;
+const roots: TocNode[] = [];
+const stack: TocNode[] = [];
+
+for (const heading of visibleHeadings) {
+  const node: TocNode = { ...heading, children: [] };
+  while (stack.length > 0 && stack[stack.length - 1].depth >= node.depth) stack.pop();
+
+  const parent = stack[stack.length - 1];
+  if (parent) parent.children.push(node);
+  else roots.push(node);
+  stack.push(node);
+}
+
+const linkClass = (slug: string) => `toc-link flex-1 py-1 border-l-2 border-transparent hover:border-slate-700 light:hover:border-slate-300 pl-2 transition-colors ${
+  currentHeading === slug
+    ? 'text-cyan-400 light:text-cyan-600'
+    : 'text-slate-400 light:text-slate-600 hover:text-slate-300 light:hover:text-slate-500'
+}`;
+---
+
+<ul class="space-y-1 text-sm">
+  {roots.map((root, rootIndex) => {
+    const rootId = `${idPrefix}-toc-${rootIndex}`;
+
+    return (
+      <li class="toc-node">
+        <div class="flex items-start gap-1">
+          {root.children.length > 0 ? (
+            <button
+              type="button"
+              class="toc-section-toggle mt-1 p-0.5 text-slate-500 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+              aria-expanded="false"
+              aria-controls={rootId}
+              aria-label={`Show subsections for ${root.text}`}
+              data-heading={root.text}
+            >
+              <svg class="toc-section-chevron w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          ) : <span class="w-[18px] shrink-0" aria-hidden="true"></span>}
+          <a href={`#${root.slug}`} class={linkClass(root.slug)} data-toc-slug={root.slug}>{root.text}</a>
+        </div>
+
+        {root.children.length > 0 && (
+          <ul id={rootId} class="toc-section-children hidden ml-[18px] space-y-1">
+            {root.children.map((child, childIndex) => {
+              const childId = `${rootId}-${childIndex}`;
+
+              return (
+                <li class="toc-node">
+                  <div class="flex items-start gap-1">
+                    {child.children.length > 0 ? (
+                      <button
+                        type="button"
+                        class="toc-section-toggle mt-1 p-0.5 text-slate-500 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+                        aria-expanded="false"
+                        aria-controls={childId}
+                        aria-label={`Show subsections for ${child.text}`}
+                        data-heading={child.text}
+                      >
+                        <svg class="toc-section-chevron w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    ) : <span class="w-[18px] shrink-0" aria-hidden="true"></span>}
+                    <a href={`#${child.slug}`} class={linkClass(child.slug)} data-toc-slug={child.slug}>{child.text}</a>
+                  </div>
+
+                  {child.children.length > 0 && (
+                    <ul id={childId} class="toc-section-children hidden ml-[18px] space-y-1">
+                      {child.children.map((grandchild) => (
+                        <li class="toc-node">
+                          <div class="flex items-start gap-1">
+                            <span class="w-[18px] shrink-0" aria-hidden="true"></span>
+                            <a
+                              href={`#${grandchild.slug}`}
+                              class={linkClass(grandchild.slug)}
+                              data-toc-slug={grandchild.slug}
+                            >
+                              {grandchild.text}
+                            </a>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </li>
+    );
+  })}
+</ul>

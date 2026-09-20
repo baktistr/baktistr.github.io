@@ -2,6 +2,7 @@
 title: "5 Puisi Favorit dari Buku Sea of Strangers"
 description: "Review dan 5 puisi favorit dari buku puisi Sea of Strangers karya Lang Leav"
 pubDate: 2018-09-19
+category: Books
 tags: ["personal", "books", "poetry"]
 ---
 

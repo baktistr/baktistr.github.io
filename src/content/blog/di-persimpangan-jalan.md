@@ -2,6 +2,7 @@
 title: "Di Persimpangan Jalan"
 description: "Refleksi tentang career crossroads dan keputusan untuk mengejar OSCP"
 pubDate: 2019-04-07
+category: Career
 tags: ["personal", "career", "security"]
 ---
 

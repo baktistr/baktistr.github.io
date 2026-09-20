@@ -2,6 +2,7 @@
 title: "OverTheWire: Bandit Level 11-15 (Bahasa Indonesia)"
 description: "Writeup untuk OverTheWire Bandit wargame level 11-15, termasuk ROT13, compression, dan SSH keys"
 pubDate: 2021-05-27
+category: Cybersecurity
 tags: ["ctf", "overthewire", "writeup", "security"]
 ---
 

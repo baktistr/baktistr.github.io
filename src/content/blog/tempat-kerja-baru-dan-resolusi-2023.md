@@ -2,6 +2,7 @@
 title: "Tempat kerja baru dan Resolusi 2023"
 description: "Career transition in 2023 - new role, new challenges, and resolutions for the year"
 pubDate: 2023-01-22
+category: Career
 tags: ["personal", "career", "health", "finance"]
 ---
 

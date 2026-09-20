@@ -2,6 +2,7 @@
 title: "The Journey Begins"
 description: "Post pertama - memulai perjalanan baru dalam blogging"
 pubDate: 2018-02-24
+category: Personal
 tags: ["personal", "introduction"]
 ---
 

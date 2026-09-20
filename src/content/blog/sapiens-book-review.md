@@ -2,6 +2,7 @@
 title: "Sapiens: A Brief History of Humankind"
 description: "Book review - Sapiens karya Yuval Noah Harari tentang sejarah singkat umat manusia"
 pubDate: 2019-12-26
+category: Books
 tags: ["personal", "books", "review"]
 ---
 

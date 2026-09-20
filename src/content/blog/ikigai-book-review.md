@@ -2,6 +2,7 @@
 title: "Ikigai: The Japanese Secret to a Long and Happy Life"
 description: "Book review - Ikigai dan rahasia Jepang untuk hidup panjang dan bahagia"
 pubDate: 2019-12-26
+category: Books
 tags: ["personal", "books", "review"]
 ---
 

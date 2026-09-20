@@ -2,6 +2,7 @@
 title: "Khayrania Alisha Adhityatama"
 description: "A heartfelt letter to my daughter on her 18-month birthday"
 pubDate: 2022-10-30
+category: Personal
 tags: ["personal", "family"]
 ---
 

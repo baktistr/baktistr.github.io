@@ -2,6 +2,7 @@
 title: "2019 was a blast!, 2020 is coming!"
 description: "Reflecting on 2019 and setting goals for the new year"
 pubDate: 2019-12-25
+category: Personal
 tags: ["personal", "reflection", "goals"]
 ---
 

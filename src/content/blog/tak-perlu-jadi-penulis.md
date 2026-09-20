@@ -2,6 +2,7 @@
 title: "Tak Perlu Jadi Penulis. Jadilah Orang yang Menulis"
 description: "Tentang mengatasi perfectionism dalam menulis dan pentingnya sharing knowledge"
 pubDate: 2018-03-31
+category: Writing
 tags: ["personal", "writing", "productivity"]
 ---
 

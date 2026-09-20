@@ -7,27 +7,313 @@ const allPosts = await getCollection('blog');
 const posts = allPosts
   .filter((post) => !post.data.draft)
   .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+
+const archiveMap = new Map<number, Map<number, number>>();
+const categoryCounts = new Map<string, number>();
+
+for (const post of posts) {
+  const year = post.data.pubDate.getUTCFullYear();
+  const month = post.data.pubDate.getUTCMonth();
+  const months = archiveMap.get(year) ?? new Map<number, number>();
+
+  months.set(month, (months.get(month) ?? 0) + 1);
+  archiveMap.set(year, months);
+  categoryCounts.set(post.data.category, (categoryCounts.get(post.data.category) ?? 0) + 1);
+}
+
+const archives = [...archiveMap.entries()]
+  .sort(([yearA], [yearB]) => yearB - yearA)
+  .map(([year, months]) => ({
+    year,
+    count: [...months.values()].reduce((total, count) => total + count, 0),
+    months: [...months.entries()]
+      .sort(([monthA], [monthB]) => monthB - monthA)
+      .map(([month, count]) => ({
+        name: new Intl.DateTimeFormat('en-US', { month: 'long', timeZone: 'UTC' }).format(
+          new Date(Date.UTC(year, month, 1))
+        ),
+        value: `${year}-${String(month + 1).padStart(2, '0')}`,
+        count,
+      })),
+  }));
+
+const categories = [...categoryCounts.entries()].sort(([categoryA], [categoryB]) =>
+  categoryA.localeCompare(categoryB)
+);
 ---
 
 <BaseLayout title="Blog" description="Personal blog posts, thoughts, and updates">
-  <div class="max-w-4xl mx-auto">
-    <header class="mb-12">
+  <div class="max-w-6xl mx-auto">
+    <header class="mb-10">
       <h1 class="text-3xl md:text-4xl font-bold text-slate-100 light:text-slate-900 mb-4">Blog</h1>
       <p class="text-lg text-slate-400 light:text-slate-600">
         Personal posts, learning journey updates, and random technical thoughts.
       </p>
     </header>
 
-    {posts.length > 0 ? (
-      <div class="space-y-6">
-        {posts.map((post) => (
-          <PostCard post={post} />
-        ))}
-      </div>
-    ) : (
-      <div class="text-center py-12">
-        <p class="text-slate-500 light:text-slate-400">No blog posts yet. Check back soon!</p>
-      </div>
-    )}
+    <div class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-start">
+      <main>
+        <div class="flex items-center justify-between gap-4 mb-5">
+          <p id="blog-results-summary" class="text-sm text-slate-500 light:text-slate-600" aria-live="polite">
+            Showing all {posts.length} posts
+          </p>
+          <button
+            id="clear-blog-filter"
+            type="button"
+            class="hidden text-sm text-cyan-400 light:text-cyan-600 hover:text-cyan-300 light:hover:text-cyan-700 transition-colors"
+          >
+            Clear filter
+          </button>
+        </div>
+
+        {posts.length > 0 ? (
+          <div id="blog-posts" class="space-y-6">
+            {posts.map((post) => {
+              const year = String(post.data.pubDate.getUTCFullYear());
+              const month = `${year}-${String(post.data.pubDate.getUTCMonth() + 1).padStart(2, '0')}`;
+
+              return (
+                <div
+                  class="blog-post-item"
+                  data-year={year}
+                  data-month={month}
+                  data-category={post.data.category}
+                >
+                  <PostCard post={post} />
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div class="text-center py-12">
+            <p class="text-slate-500 light:text-slate-400">No blog posts yet. Check back soon!</p>
+          </div>
+        )}
+
+        <div id="blog-empty-filter" class="hidden text-center py-12 rounded-lg border border-dashed border-slate-800 light:border-slate-300">
+          <p class="text-slate-500 light:text-slate-600">No posts match this filter.</p>
+        </div>
+      </main>
+
+      {posts.length > 0 && (
+        <aside class="lg:sticky lg:top-24" aria-label="Browse blog posts">
+          <div class="rounded-lg bg-slate-900/50 light:bg-white border border-slate-800 light:border-slate-200 overflow-hidden">
+            <div class="p-5 border-b border-slate-800 light:border-slate-200">
+              <a
+                href="/blog"
+                class="blog-filter-link flex items-center justify-between gap-3 text-sm font-semibold text-slate-200 light:text-slate-800 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+                data-filter-type="all"
+              >
+                <span>All posts</span>
+                <span class="filter-count">{posts.length}</span>
+              </a>
+            </div>
+
+            <section class="p-5 border-b border-slate-800 light:border-slate-200">
+              <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 light:text-slate-500 mb-4">
+                Archive
+              </h2>
+              <div class="space-y-4">
+                {archives.map(({ year, count, months }) => (
+                  <div>
+                    <div class="flex items-center gap-1">
+                      <button
+                        type="button"
+                        class="archive-year-toggle -ml-1 p-1 text-slate-500 light:text-slate-500 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+                        aria-expanded="false"
+                        aria-controls={`archive-year-${year}`}
+                        aria-label={`Show months for ${year}`}
+                      >
+                        <svg class="archive-chevron w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                      <a
+                        href={`/blog?year=${year}`}
+                        class="blog-filter-link flex flex-1 items-center justify-between gap-3 text-sm font-semibold text-slate-300 light:text-slate-700 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+                        data-filter-type="year"
+                        data-filter-value={String(year)}
+                        data-filter-label={String(year)}
+                      >
+                        <span>{year}</span>
+                        <span class="filter-count">{count}</span>
+                      </a>
+                    </div>
+                    <div id={`archive-year-${year}`} class="archive-months hidden mt-2 ml-3 pl-3 border-l border-slate-800 light:border-slate-200 space-y-1.5">
+                      {months.map((month) => (
+                        <a
+                          href={`/blog?month=${month.value}`}
+                          class="blog-filter-link flex items-center justify-between gap-3 text-sm text-slate-500 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+                          data-filter-type="month"
+                          data-filter-value={month.value}
+                          data-filter-label={`${month.name} ${year}`}
+                        >
+                          <span>{month.name}</span>
+                          <span class="filter-count">{month.count}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section class="p-5">
+              <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 light:text-slate-500 mb-4">
+                Categories
+              </h2>
+              <div class="space-y-2">
+                {categories.map(([category, count]) => (
+                  <a
+                    href={`/blog?category=${encodeURIComponent(category)}`}
+                    class="blog-filter-link flex items-center justify-between gap-3 text-sm text-slate-400 light:text-slate-600 hover:text-cyan-400 light:hover:text-cyan-600 transition-colors"
+                    data-filter-type="category"
+                    data-filter-value={category}
+                    data-filter-label={category}
+                  >
+                    <span>{category}</span>
+                    <span class="filter-count">{count}</span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          </div>
+        </aside>
+      )}
+    </div>
   </div>
 </BaseLayout>
+
+<script>
+  function initBlogFilters() {
+    const postsContainer = document.getElementById('blog-posts');
+    if (!postsContainer || postsContainer.dataset.filtersInitialized === 'true') return;
+    postsContainer.dataset.filtersInitialized = 'true';
+
+    const postItems = Array.from(document.querySelectorAll<HTMLElement>('.blog-post-item'));
+    const filterLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('.blog-filter-link'));
+    const summary = document.getElementById('blog-results-summary');
+    const emptyState = document.getElementById('blog-empty-filter');
+    const clearButton = document.getElementById('clear-blog-filter');
+    const yearToggles = Array.from(document.querySelectorAll<HTMLButtonElement>('.archive-year-toggle'));
+
+    const labels: Record<string, string> = {
+      year: 'posts from',
+      month: 'posts from',
+      category: 'posts in',
+    };
+
+    function applyFilter(type = 'all', value = '', updateHistory = false) {
+      let visibleCount = 0;
+      const activeLink = filterLinks.find((link) =>
+        link.dataset.filterType === type && link.dataset.filterValue === value
+      );
+      const displayValue = activeLink?.dataset.filterLabel ?? value;
+
+      postItems.forEach((post) => {
+        const matches = type === 'all' || post.dataset[type] === value;
+        post.classList.toggle('hidden', !matches);
+        if (matches) visibleCount += 1;
+      });
+
+      filterLinks.forEach((link) => {
+        const isActive = type === 'all'
+          ? link.dataset.filterType === 'all'
+          : link.dataset.filterType === type && link.dataset.filterValue === value;
+        link.toggleAttribute('aria-current', isActive);
+      });
+
+      if (summary) {
+        summary.textContent = type === 'all'
+          ? `Showing all ${postItems.length} posts`
+          : `Showing ${visibleCount} ${labels[type] ?? 'posts for'} ${displayValue}`;
+      }
+
+      emptyState?.classList.toggle('hidden', visibleCount !== 0);
+      clearButton?.classList.toggle('hidden', type === 'all');
+
+      if (updateHistory) {
+        const url = new URL(window.location.href);
+        url.search = '';
+        if (type !== 'all') url.searchParams.set(type, value);
+        window.history.pushState({}, '', url);
+      }
+    }
+
+    function filterFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      for (const type of ['year', 'month', 'category']) {
+        const value = params.get(type);
+        if (value) {
+          applyFilter(type, value);
+          return;
+        }
+      }
+      applyFilter();
+    }
+
+    filterLinks.forEach((link) => {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        applyFilter(link.dataset.filterType, link.dataset.filterValue, true);
+      });
+    });
+
+    yearToggles.forEach((toggle) => {
+      toggle.addEventListener('click', () => {
+        const targetId = toggle.getAttribute('aria-controls');
+        const months = targetId ? document.getElementById(targetId) : null;
+        if (!months) return;
+
+        const willOpen = toggle.getAttribute('aria-expanded') !== 'true';
+        toggle.setAttribute('aria-expanded', String(willOpen));
+        toggle.setAttribute('aria-label', `${willOpen ? 'Hide' : 'Show'} months for ${targetId?.replace('archive-year-', '')}`);
+        months.classList.toggle('hidden', !willOpen);
+        toggle.querySelector('.archive-chevron')?.classList.toggle('rotate-90', willOpen);
+      });
+    });
+
+    clearButton?.addEventListener('click', () => applyFilter('all', '', true));
+    window.addEventListener('popstate', filterFromUrl);
+    filterFromUrl();
+  }
+
+  document.addEventListener('DOMContentLoaded', initBlogFilters);
+  document.addEventListener('astro:page-load', initBlogFilters);
+</script>
+
+<style>
+  .blog-filter-link[aria-current='true'] {
+    color: rgb(34 211 238);
+  }
+
+  .blog-filter-link[aria-current='true'] .filter-count {
+    background-color: rgb(34 211 238 / 0.15);
+    color: rgb(103 232 249);
+  }
+
+  .filter-count {
+    min-width: 1.5rem;
+    border-radius: 9999px;
+    background-color: rgb(30 41 59 / 0.8);
+    padding: 0.125rem 0.45rem;
+    text-align: center;
+    font-size: 0.7rem;
+    line-height: 1.1rem;
+    color: rgb(148 163 184);
+  }
+
+  :global(html.light) .blog-filter-link[aria-current='true'] {
+    color: rgb(8 145 178);
+  }
+
+  :global(html.light) .blog-filter-link[aria-current='true'] .filter-count {
+    background-color: rgb(6 182 212 / 0.12);
+    color: rgb(14 116 144);
+  }
+
+  :global(html.light) .filter-count {
+    background-color: rgb(241 245 249);
+    color: rgb(100 116 139);
+  }
+</style>

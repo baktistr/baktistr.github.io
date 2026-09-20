@@ -2,6 +2,7 @@
 title: "OverTheWire: Bandit Level 6-10 (Bahasa Indonesia)"
 description: "Writeup untuk OverTheWire Bandit wargame level 6-10, melanjutkan pembelajaran command line Linux"
 pubDate: 2021-05-22
+category: Cybersecurity
 tags: ["ctf", "overthewire", "writeup", "security"]
 ---
 

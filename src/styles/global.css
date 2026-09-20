@@ -7,7 +7,7 @@
     @apply scroll-smooth;
   }
 
-  /* Default is dark mode, light mode when .light class is present */
+  /* Dark palette is the base; the early theme script adds .light when needed. */
   body {
     @apply bg-slate-950 text-slate-100 antialiased;
     font-family: 'Inter', system-ui, sans-serif;

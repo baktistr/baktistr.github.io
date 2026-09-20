@@ -2,6 +2,7 @@
 title: "HER"
 description: "A love story - from a coffee shop meeting to our wedding day"
 pubDate: 2020-07-31
+category: Personal
 tags: ["personal", "family", "love"]
 ---
 

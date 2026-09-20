@@ -2,6 +2,7 @@
 title: "Being a student (again)"
 description: "Reflecting my 4 months studying abroad for the first time"
 pubDate: 2026-01-26
+category: Personal
 tags: ["personal", "school", "cmu"]
 draft: false
 ---

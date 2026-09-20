@@ -2,6 +2,7 @@
 title: "(not) a small updates"
 description: "Life updates after a two-year hiatus - career move to cybersecurity and pursuing a Master's degree"
 pubDate: 2025-02-21
+category: Personal
 tags: ["personal", "life", "health", "mental-health", "travel"]
 ---
 
