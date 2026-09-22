@@ -10,7 +10,7 @@ const { headings, currentHeading } = Astro.props;
 ---
 
 <!-- Desktop Sidebar -->
-<aside class="hidden xl:block w-64 shrink-0 sticky top-20 h-[calc(100vh-5rem)] overflow-y-auto pl-6 border-l border-slate-800 light:border-slate-200 sidebar-scroll">
+<aside class="docs-toc hidden xl:block shrink-0 sticky top-20 h-[calc(100vh-5rem)] overflow-y-auto pl-6 border-l border-slate-800 light:border-slate-200 sidebar-scroll">
   <nav>
     <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
       On this page
@@ -136,6 +136,20 @@ const { headings, currentHeading } = Astro.props;
 </script>
 
 <style>
+  @media (min-width: 1280px) {
+    .docs-toc {
+      --right-gutter: min(calc(50vw - 640px), 12rem);
+      width: calc(16rem + var(--right-gutter));
+      margin-right: calc(0px - var(--right-gutter));
+    }
+  }
+
+  @media (min-width: 1536px) {
+    .docs-toc {
+      --right-gutter: min(calc(50vw - 768px), 12rem);
+    }
+  }
+
   :global(.toc-link[data-active='true']) {
     color: rgb(34 211 238);
     border-left-color: rgb(34 211 238);
