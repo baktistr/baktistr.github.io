@@ -12,6 +12,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# downloaded TMDB source assets (selected post images live in public/)
+/assets/tmdb/
+
 
 # environment variables
 .env
