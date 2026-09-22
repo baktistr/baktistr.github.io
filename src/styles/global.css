@@ -104,6 +104,21 @@
     @apply rounded-lg my-4;
   }
 
+  .prose figure {
+    @apply my-8;
+  }
+
+  .prose figure img {
+    @apply my-0;
+  }
+
+  .prose figcaption {
+    @apply mt-2 pl-3 border-l-2 border-cyan-500/50 text-sm italic leading-snug text-slate-400;
+  }
+  html.light .prose figcaption {
+    @apply border-cyan-600/40 text-slate-500;
+  }
+
   .prose table {
     @apply border-collapse;
     width: max-content;

@@ -11,9 +11,10 @@ draft: false
 
 I recently watched *18×2: Beyond Youthful Days* on Netflix, a Taiwanese-Japanese romantic drama. I didn't expect it to stay with me the way it did. It has also been a while since I last wrote about a movie in my spare time.
 
-![Jimmy and Ami sitting together beside a train window in 18×2](/images/blog/may-our-travel-continue/jimmy-ami-train.jpg)
-
-*Jimmy and Ami on a train. Film still from 18×2: Beyond Youthful Days via [TMDB](https://www.themoviedb.org/movie/1188258-18x2/images/backdrops?language=en-US), uploaded by pondheart.*
+<figure>
+  <img src="/images/blog/may-our-travel-continue/jimmy-ami-train.jpg" alt="Jimmy and Ami sitting together beside a train window in 18×2" width="780" height="439" decoding="async" />
+  <figcaption>Jimmy and Ami on a train. Film still from <cite>18×2: Beyond Youthful Days</cite> via <a href="https://www.themoviedb.org/movie/1188258-18x2/images/backdrops?language=en-US">TMDB</a>, uploaded by pondheart.</figcaption>
+</figure>
 
 ## About *18×2: Beyond Youthful Days*
 
@@ -32,9 +33,10 @@ Some people might see ***18×2*** mainly as a romance. What stayed with me, thou
 
 One idea from the film has stayed with me: a journey becomes meaningful partly because we cannot know exactly what will happen along the way. Jimmy sets out for a place on a map, but he is looking for more than a destination. He is trying to make peace with his past and with himself.
 
-![Jimmy and Ami wearing helmets on a scooter in the city in 18×2](/images/blog/may-our-travel-continue/jimmy-ami-scooter.jpg)
-
-*Jimmy and Ami share a ride through the city. Film still from 18×2: Beyond Youthful Days via [TMDB](https://www.themoviedb.org/movie/1188258-18x2/images/backdrops?language=en-US), uploaded by pondheart.*
+<figure>
+  <img src="/images/blog/may-our-travel-continue/jimmy-ami-scooter.jpg" alt="Jimmy and Ami wearing helmets on a scooter in the city in 18×2" width="780" height="439" loading="lazy" decoding="async" />
+  <figcaption>Jimmy and Ami share a ride through the city. Film still from <cite>18×2: Beyond Youthful Days</cite> via <a href="https://www.themoviedb.org/movie/1188258-18x2/images/backdrops?language=en-US">TMDB</a>, uploaded by pondheart.</figcaption>
+</figure>
 
 The people he meets on the way may only be there briefly, yet, like Ami, they still ***leave a mark***. The film reminds me that a journey is not just its starting point and its destination. It is also the conversations, changed plans, passing trains, and strangers we may never meet again.
 
@@ -52,9 +54,10 @@ The way ***18×2*** moves through time made me think about this. The past is not
 
 Perhaps that is how journeys work. While we are living them, the days can feel ordinary. Only when we stop and look back do we see how far we have come. Maybe we need to pause and rest once in a while, too.
 
-![Jimmy standing beside a train at a snowy station in 18×2](/images/blog/may-our-travel-continue/jimmy-snowy-station.jpg)
-
-*Jimmy pauses at a snowy station. Film still from 18×2: Beyond Youthful Days via [TMDB](https://www.themoviedb.org/movie/1188258-18x2/images/backdrops?language=en-US), uploaded by Youminasu.*
+<figure>
+  <img src="/images/blog/may-our-travel-continue/jimmy-snowy-station.jpg" alt="Jimmy standing beside a train at a snowy station in 18×2" width="780" height="439" loading="lazy" decoding="async" />
+  <figcaption>Jimmy pauses at a snowy station. Film still from <cite>18×2: Beyond Youthful Days</cite> via <a href="https://www.themoviedb.org/movie/1188258-18x2/images/backdrops?language=en-US">TMDB</a>, uploaded by Youminasu.</figcaption>
+</figure>
 
 ## People Come and Go, and That's Okay
 
@@ -68,9 +71,10 @@ Jimmy and Ami's story is, of course, very different from mine. I do not want to 
 
 > “I got to see snow for the first time and made a young friend!”
 
-![Jimmy and a new friend looking at their phones beside a train in 18×2](/images/blog/may-our-travel-continue/jimmy-new-friend.jpg)
-
-*Jimmy and a new friend during his journey. Film still from 18×2: Beyond Youthful Days via [TMDB](https://www.themoviedb.org/movie/1188258-18x2/images/backdrops?language=en-US), uploaded by Youminasu.*
+<figure>
+  <img src="/images/blog/may-our-travel-continue/jimmy-new-friend.jpg" alt="Jimmy and a new friend looking at their phones beside a train in 18×2" width="780" height="439" loading="lazy" decoding="async" />
+  <figcaption>Jimmy and a new friend during his journey. Film still from <cite>18×2: Beyond Youthful Days</cite> via <a href="https://www.themoviedb.org/movie/1188258-18x2/images/backdrops?language=en-US">TMDB</a>, uploaded by Youminasu.</figcaption>
+</figure>
 
 That line also feels close to my experience. During my studies, I have made new friends from the United States, Europe, India, China, Pakistan, and elsewhere. Some have already graduated and moved on to the next chapters of their lives. I am grateful to all of them for being part of my time here in America. And after experiencing winter here, I am also a little more grateful for the warmth of a tropical country.
 
@@ -80,12 +84,15 @@ In the end, life is not about changing the past or endlessly asking, ***What if 
 
 I do not know exactly where our next journey will take us. There may be a new city, a new job, new challenges, or a chance to return to a quieter life at home. For now, I want to keep learning, be more present, and prepare myself a little better for Pittsburgh's cold November wind.
 
-![A person looking over a city at sunset in 18×2](/images/blog/may-our-travel-continue/sunset-over-city.jpg)
-
-*Looking out over the city at sunset. Film still from 18×2: Beyond Youthful Days via [TMDB](https://www.themoviedb.org/movie/1188258-18x2/images/backdrops?language=en-US), uploaded by AiBframes.*
+<figure>
+  <img src="/images/blog/may-our-travel-continue/sunset-over-city.jpg" alt="A person looking over a city at sunset in 18×2" width="780" height="439" loading="lazy" decoding="async" />
+  <figcaption>Looking out over the city at sunset. Film still from <cite>18×2: Beyond Youthful Days</cite> via <a href="https://www.themoviedb.org/movie/1188258-18x2/images/backdrops?language=en-US">TMDB</a>, uploaded by AiBframes.</figcaption>
+</figure>
 
 A year of living on my own in the United States has taught me that a journey is not just about how far we go. It is about whom we miss, what we learn, and who we become before we find our way home.
 
 To my wife: I'll be back soon. Thank you for waiting for me. May our travel continue, wherever life takes us next.
+
+---
 
 **Image credits:** The film stills above were sourced from [The Movie Database (TMDB)](https://www.themoviedb.org/movie/1188258-18x2/images/backdrops?language=en-US); the TMDB uploaders are named in the captions. Copyright remains with the respective rights holders. This post is not endorsed or certified by TMDB.

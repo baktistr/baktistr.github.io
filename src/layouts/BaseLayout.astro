@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import ThemeToggle from '../components/ui/ThemeToggle.astro';
 import Search from '../components/ui/Search.astro';
+import ReadingProgress from '../components/ui/ReadingProgress.astro';
 
 interface Props {
   title?: string;
@@ -9,6 +10,7 @@ interface Props {
   image?: string;
   type?: 'website' | 'article';
   pubDate?: Date;
+  readingProgress?: boolean;
 }
 
 const SITE_NAME = 'Bakti Satria Adhityatama';
@@ -19,6 +21,7 @@ const {
   image = '/logo_blog.png',
   type = 'website',
   pubDate,
+  readingProgress = false,
 } = Astro.props;
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
@@ -190,6 +193,7 @@ const ogImageURL = new URL(image, Astro.site).toString();
           </div>
         </nav>
       </div>
+      {readingProgress && <ReadingProgress />}
     </header>
 
     <main class="flex-1 container mx-auto px-4 py-8">
