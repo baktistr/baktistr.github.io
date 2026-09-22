@@ -3,6 +3,7 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Badge from '../../components/ui/Badge.astro';
 import TableOfContents from '../../components/docs/TableOfContents.astro';
+import { getFirstContentImage } from '../../utils/socialImage';
 
 export async function getStaticPaths() {
   const projects = await getCollection('projects');
@@ -33,7 +34,11 @@ const statusLabels = {
 };
 ---
 
-<BaseLayout title={project.data.title} description={project.data.description}>
+<BaseLayout
+  title={project.data.title}
+  description={project.data.description}
+  image={getFirstContentImage(project.body) ?? project.data.image}
+>
   {hasToc && (
     <button
       id="toc-modal-toggle"

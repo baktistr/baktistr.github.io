@@ -18,14 +18,14 @@ const SITE_NAME = 'Bakti Satria Adhityatama';
 const {
   title = SITE_NAME,
   description = 'Personal blog and technical documentation for cybersecurity professionals',
-  image = '/logo_blog.png',
+  image = '/me_pixelated.png',
   type = 'website',
   pubDate,
   readingProgress = false,
 } = Astro.props;
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
-const ogImageURL = new URL(image, Astro.site).toString();
+const ogImageURL = new URL(image, Astro.url).toString();
 ---
 
 <!doctype html>

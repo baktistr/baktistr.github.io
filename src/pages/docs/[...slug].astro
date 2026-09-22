@@ -2,6 +2,7 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import DocsLayout from '../../layouts/DocsLayout.astro';
 import Badge from '../../components/ui/Badge.astro';
+import { getFirstContentImage } from '../../utils/socialImage';
 
 export async function getStaticPaths() {
   const docs = await getCollection('docs');
@@ -45,6 +46,7 @@ const next = currentIndex < sortedDocs.length - 1 ? sortedDocs[currentIndex + 1]
 <DocsLayout
   title={doc.data.title}
   description={doc.data.description}
+  image={getFirstContentImage(doc.body)}
   headings={headings}
   breadcrumbs={breadcrumbs}
   prev={prev ? { title: prev.data.title, slug: prev.slug } : undefined}
