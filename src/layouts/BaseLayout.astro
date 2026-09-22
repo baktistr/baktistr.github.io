@@ -3,6 +3,8 @@ import '../styles/global.css';
 import ThemeToggle from '../components/ui/ThemeToggle.astro';
 import Search from '../components/ui/Search.astro';
 import ReadingProgress from '../components/ui/ReadingProgress.astro';
+import PrivacyNotice from '../components/ui/PrivacyNotice.astro';
+import ConsentAnalytics from '../components/ui/ConsentAnalytics.astro';
 
 interface Props {
   title?: string;
@@ -55,6 +57,8 @@ const ogImageURL = new URL(image, Astro.url).toString();
         document.documentElement.classList.toggle('light', theme === 'light');
       })();
     </script>
+
+    <ConsentAnalytics />
 
     <!-- Open Graph -->
     <meta property="og:type" content={type} />
@@ -203,8 +207,12 @@ const ogImageURL = new URL(image, Astro.url).toString();
     <footer class="border-t border-slate-800 light:border-slate-200 py-8 mt-auto">
       <div class="container mx-auto px-4 text-center text-sm text-slate-500 light:text-slate-600">
         <p>&copy; {new Date().getFullYear()} Bakti Satria Adhityatama, vibecoded with ❤️. All rights reserved.</p>
+        <a href="/privacy" class="mt-2 inline-block hover:text-cyan-400 light:hover:text-cyan-600">Privacy & Cookies</a>
+        <button id="privacy-settings-open" type="button" aria-controls="analytics-consent" class="ml-4 hover:text-cyan-400 light:hover:text-cyan-600">Analytics settings</button>
       </div>
     </footer>
+
+    <PrivacyNotice />
 
     <script>
       const mobileMenuButton = document.getElementById('mobile-menu-button');

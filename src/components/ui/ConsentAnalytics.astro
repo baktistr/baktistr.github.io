@@ -1,0 +1,25 @@
+<script is:inline>
+  (function() {
+    const storageKey = 'analytics-consent';
+    const beaconUrl = 'https://static.cloudflareinsights.com/beacon.min.js';
+
+    function loadBeacon() {
+      if (document.querySelector('script[data-consent-analytics]')) return;
+
+      const script = document.createElement('script');
+      script.type = 'module';
+      script.src = beaconUrl;
+      script.setAttribute('data-cf-beacon', JSON.stringify({ token: '7d335f80a5d44529aaa1c18c16a4f02b' }));
+      script.setAttribute('data-consent-analytics', '');
+      document.head.appendChild(script);
+    }
+
+    window.addEventListener('site:analytics-consent-granted', loadBeacon);
+
+    try {
+      if (localStorage.getItem(storageKey) === 'allow') loadBeacon();
+    } catch (_) {
+      // Without storage, analytics stays off until this visit's explicit opt-in.
+    }
+  })();
+</script>
